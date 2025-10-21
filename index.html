@@ -21,8 +21,8 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://js.stripe.com/v3/"></script>
     
-    <!-- D3.js for Heatmap -->
-    <script src="https://d3js.org/d7.min.js"></script>
+    <!-- D3.js for Heatmap - Corrected URL -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #e5e7eb; }
@@ -286,10 +286,10 @@
         };
         const STRIPE_PUBLISHABLE_KEY = 'YOUR_STRIPE_PUBLISHABLE_KEY'; 
         const ADMIN_EMAIL = "travisclevenger.tc@gmail.com";
-        const COINCAP_API_URL = 'https://api.coincap.io/v2/assets';
-
+        
         // Secure Netlify Function Endpoints
-        const FMP_PROXY_URL = '/.netlify/functions/options-flow'; // Live options data endpoint
+        const OPTIONS_PROXY_URL = '/.netlify/functions/options-flow';
+        const CRYPTO_PROXY_URL = '/.netlify/functions/crypto-flow';
         const NEWS_PROXY_URL = '/.netlify/functions/news';
 
         // --- App State ---
@@ -534,6 +534,11 @@
         }
         
         function renderHeatmap() {
+            if (typeof d3 === 'undefined') {
+                console.error("D3.js library is not loaded. Heatmap cannot be rendered.");
+                DOMElements.heatmapContainer.innerHTML = '<p class="text-red-400 text-center p-8">Error: Charting library failed to load.</p>';
+                return;
+            }
             const container = d3.select("#heatmap-container");
             container.html('<p class="text-neutral-500 text-center p-8">Generating heatmap...</p>');
 
@@ -542,7 +547,7 @@
                 return;
             }
 
-            const aggregatedData = d3.rollups(
+            const aggregatedData = Array.from(d3.rollup(
                 currentFlowData,
                 v => ({
                     totalPremium: d3.sum(v, d => d.totalValue),
@@ -550,7 +555,7 @@
                     count: v.length
                 }),
                 d => d.symbol
-            ).map(([key, value]) => ({ symbol: key, ...value }));
+            ), ([key, value]) => ({ symbol: key, ...value }));
 
             const width = container.node().getBoundingClientRect().width;
             const height = container.node().getBoundingClientRect().height;
@@ -559,7 +564,7 @@
             
             container.html(''); // Clear loading message
             const svg = container.append("svg").attr("width", width).attr("height", height).attr("font-size", 10).attr("text-anchor", "middle");
-            const g = svg.selectAll("g").data(root.leaves()).enter().append("g").attr("class", "heatmap-bubble").attr("transform", d => `translate(${d.x},${d.y})`).on("click", (event, d) => showChartView(d.data.symbol));
+            const g = svg.selectAll("g").data(root.leaves()).join("g").attr("class", "heatmap-bubble").attr("transform", d => `translate(${d.x},${d.y})`).on("click", (event, d) => showChartView(d.data.symbol));
 
             g.append("circle")
                 .attr("r", d => d.r)
@@ -572,7 +577,7 @@
 
             g.append("text").selectAll("tspan")
                 .data(d => [d.data.symbol, formatCurrency(d.data.totalPremium)])
-                .enter().append("tspan")
+                .join("tspan")
                 .attr("x", 0)
                 .attr("y", (d, i) => i * 1.1 + "em")
                 .attr("dy", "-0.25em")
@@ -610,40 +615,43 @@
 
         async function fetchAndRenderFlow() {
             if (isPaused || document.hidden) return;
-            DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-neutral-500 p-12">Fetching latest options flow...</td></tr>`;
+            if (currentFlowData.length === 0) {
+                 DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-neutral-500 p-12">Connecting to live options feed...</td></tr>`;
+            }
             
-            const rawData = await fetchApi(FMP_PROXY_URL);
+            const rawData = await fetchApi(OPTIONS_PROXY_URL);
             
             if (!rawData) {
-                // fetchApi handles the error banner, so we just stop.
-                DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-red-400 p-12">Failed to fetch options flow data. Check API status banner at the top.</td></tr>`;
+                if (currentFlowData.length === 0) DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-red-400 p-12">Failed to fetch options flow data. Check API status banner.</td></tr>`;
                 return;
             }
 
             if (!Array.isArray(rawData) || rawData.length === 0) {
-                 DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-neutral-500 p-12">No unusual options activity detected in the last minute. Awaiting new trades...</td></tr>`;
+                 if (currentFlowData.length === 0) DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-neutral-500 p-12">No unusual options activity detected. Awaiting new trades...</td></tr>`;
                  return;
             }
 
             const newData = rawData.map(transformOptionsData);
-            currentFlowData = [...newData, ...currentFlowData].slice(0, 200);
+            currentFlowData = [...newData, ...currentFlowData].slice(0, 200); // Prepend new data
 
             renderFlowTable();
             if (DOMElements.heatmapViewBtn.classList.contains('active')) renderHeatmap();
             checkAlerts(newData);
         }
         
-        async function fetchAndRenderNews() { if (isPaused || document.hidden) return; const newsData = await fetchNewsData(); if(newsData) { currentNewsData = newsData; renderNewsFeed(); } }
+        async function fetchAndRenderNews() { if (isPaused || document.hidden) return; const newsData = await fetchApi(NEWS_PROXY_URL); if(newsData) { currentNewsData = newsData; renderNewsFeed(); } }
         
         async function fetchAndRenderCrypto() { 
             if (isPaused || document.hidden) return;
-            DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest crypto data...</td></tr>`;
-            const data = await fetchCryptoFlowData(); 
-            if(data) {
-                currentCryptoData = data;
+             if (currentCryptoData.length === 0) {
+                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Connecting to live crypto feed...</td></tr>`;
+            }
+            const result = await fetchApi(CRYPTO_PROXY_URL); 
+            if(result && result.data) {
+                currentCryptoData = result.data;
                 renderCryptoFlowTable();
             } else {
-                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-red-400 p-12">Error: Could not fetch crypto data from the API.</td></tr>`;
+                if (currentCryptoData.length === 0) DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-red-400 p-12">Error: Could not fetch crypto data from the API.</td></tr>`;
             }
         }
 
@@ -790,9 +798,7 @@
 
         async function fetchNewsData() { return fetchApi(NEWS_PROXY_URL); }
         async function fetchCryptoFlowData() { 
-            const url = `${COINCAP_API_URL}?limit=20`;
-            const result = await fetchApi(url);
-            return result ? result.data : null;
+            return await fetchApi(CRYPTO_PROXY_URL);
         }
 
         function initiateStripeCheckout(priceId) {
