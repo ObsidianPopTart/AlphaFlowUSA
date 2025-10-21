@@ -49,8 +49,23 @@
         .modal-content { transition: transform 0.25s ease; }
         .prose-invert a { color: #fb923c; }
         .prose-invert a:hover { color: #fdba74; }
-        .call-row { border-left: 3px solid #22c55e; }
-        .put-row { border-left: 3px solid #ef4444; }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.4rem;
+            font-size: 0.65rem;
+            font-weight: 600;
+            line-height: 1;
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: baseline;
+            border-radius: 0.25rem;
+            margin-right: 0.25rem;
+        }
+        .badge-sweep { background-color: #8b5cf6; color: white; }
+        .badge-block { background-color: #3b82f6; color: white; }
+        .badge-otm { background-color: #ec4899; color: white; }
+        .badge-itm { background-color: #10b981; color: white; }
     </style>
 </head>
 <body class="text-sm">
@@ -89,9 +104,9 @@
                         <div class="p-3 border-b border-neutral-800 space-y-3">
                             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                <div class="flex items-center gap-2 p-1 bg-neutral-800/50 rounded-md">
-                                    <button id="flow-view-btn" class="view-button active flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">Flow</button>
-                                    <button id="heatmap-view-btn" class="view-button flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">Heatmap</button>
+                                    <button id="flow-view-btn" class="view-button active flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">Options</button>
                                     <button id="crypto-view-btn" class="view-button flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">Crypto</button>
+                                    <button id="heatmap-view-btn" class="view-button flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">Heatmap</button>
                                 </div>
                                 <input type="text" id="search-input" placeholder="Search Ticker..." class="bg-neutral-800/50 border border-neutral-700 rounded-md pl-3 pr-3 py-1.5 w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs">
                                 <div id="flow-filters" class="flex items-center gap-2 flex-wrap">
@@ -108,7 +123,7 @@
                                         <option value="totalValue-desc">Sort: Premium (High-Low)</option>
                                     </select>
                                      <select id="premium-select" class="custom-select bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500">
-                                        <option value="0">Premium: All</option><option value="50000">&gt; $50k</option><option value="100000">&gt; $100k</option><option value="250000">&gt; $250k</option>
+                                        <option value="0">Premium: All</option><option value="100000">&gt; $100k</option><option value="250000">&gt; $250k</option><option value="1000000">&gt; $1M</option>
                                     </select>
                                     
                                 </div>
@@ -117,19 +132,40 @@
                                     <button id="pause-play-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 transition-colors text-xs w-[80px] justify-center"><i data-lucide="pause-circle" class="w-4 h-4"></i><span>Pause</span></button>
                                  </div>
                              </div>
-                             <div id="crypto-controls" class="hidden flex items-center justify-between gap-3"><h2 class="text-xl font-bold text-white">Crypto Flow</h2></div>
+                             <div id="crypto-controls" class="hidden flex items-center justify-between gap-3"><h2 class="text-xl font-bold text-white">Crypto Market Activity</h2></div>
                         </div>
                         <div id="market-status-container" class="p-3 text-center border-b border-neutral-800"></div>
                         <div id="flow-view" class="flex-grow overflow-y-auto">
-                            <table class="w-full text-left text-xs">
-                                <thead class="sticky-header text-neutral-400 uppercase bg-neutral-900"><tr><th class="p-2">Time</th><th class="p-2">Ticker</th><th class="p-2">Details</th><th class="p-2">Sentiment</th><th class="p-2 text-right">Premium</th><th class="p-2 text-right">Vol / OI</th></tr></thead>
+                            <table class="w-full text-left text-xs whitespace-nowrap">
+                                <thead class="sticky-header text-neutral-400 uppercase bg-neutral-900">
+                                    <tr>
+                                        <th class="p-2">Time</th>
+                                        <th class="p-2">Ticker</th>
+                                        <th class="p-2">Expiration</th>
+                                        <th class="p-2">Strike</th>
+                                        <th class="p-2">Side</th>
+                                        <th class="p-2 text-right">Premium</th>
+                                        <th class="p-2 text-right">Spot</th>
+                                        <th class="p-2 text-right">Vol/OI</th>
+                                        <th class="p-2 text-right">IV</th>
+                                    </tr>
+                                </thead>
                                 <tbody id="options-tbody" class="divide-y divide-neutral-800"></tbody>
                             </table>
                         </div>
                          <div id="heatmap-view" class="hidden flex-grow p-4 justify-center"><div id="heatmap-container" class="w-full h-full"></div></div>
                          <div id="crypto-view" class="hidden flex-grow overflow-y-auto">
-                            <table class="w-full text-left text-xs">
-                                <thead class="sticky-header text-neutral-400 uppercase bg-neutral-900"><tr><th class="p-2">Name</th><th class="p-2 text-right">Price</th><th class="p-2 text-right">1h %</th><th class="p-2 text-right">24h %</th><th class="p-2 text-right">24h Volume</th><th class="p-2 text-right">Market Cap</th></tr></thead>
+                            <table class="w-full text-left text-xs whitespace-nowrap">
+                                <thead class="sticky-header text-neutral-400 uppercase bg-neutral-900">
+                                    <tr>
+                                        <th class="p-2">Name</th>
+                                        <th class="p-2 text-right">Price</th>
+                                        <th class="p-2 text-right">24h %</th>
+                                        <th class="p-2 text-right">24h Vol</th>
+                                        <th class="p-2 text-right">Market Cap</th>
+                                        <th class="p-2">Last Exchange</th>
+                                    </tr>
+                                </thead>
                                 <tbody id="crypto-tbody" class="divide-y divide-neutral-800"></tbody>
                             </table>
                         </div>
@@ -137,7 +173,7 @@
                     <div class="col-span-1 bg-neutral-900 rounded-lg shadow-lg flex flex-col h-[calc(100vh-140px)]">
                         <div class="flex-grow overflow-y-auto p-3 space-y-4">
                             <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Watchlist</h2><div class="flex gap-2 mb-3"><input type="text" id="watchlist-input" placeholder="Add Ticker..." class="bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs"><button id="add-watchlist-btn" class="bg-orange-600 hover:bg-orange-500 text-white font-semibold px-3 py-1.5 rounded-md transition-colors text-xs">Add</button></div><div id="watchlist-container" class="space-y-2"></div></div>
-                            <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Alerts</h2><div class="space-y-2 mb-3"><input type="text" id="alert-ticker-input" placeholder="Ticker" class="bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs"><select id="alert-premium-select" class="custom-select bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"><option value="50000">Premium > $50k</option><option value="100000">Premium > $100k</option><option value="250000">Premium > $250k</option><option value="500000">Premium > $500k</option></select></div><button id="add-alert-btn" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold px-3 py-1.5 rounded-md transition-colors text-xs">Add Alert</button><div id="alerts-container" class="space-y-2 mt-3"></div></div>
+                            <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Alerts</h2><div class="space-y-2 mb-3"><input type="text" id="alert-ticker-input" placeholder="Ticker" class="bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs"><select id="alert-premium-select" class="custom-select bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"><option value="100000">Premium > $100k</option><option value="250000">Premium > $250k</option><option value="500000">Premium > $500k</option><option value="1000000">Premium > $1M</option></select></div><button id="add-alert-btn" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold px-3 py-1.5 rounded-md transition-colors text-xs">Add Alert</button><div id="alerts-container" class="space-y-2 mt-3"></div></div>
                             <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Market News</h2><div id="news-feed" class="space-y-3"></div></div>
                         </div>
                         <div class="p-3" id="ad-container"><div class="h-48 bg-neutral-800/50 rounded-lg flex flex-col p-4 border border-neutral-700 text-center justify-center"><p class="text-neutral-500 text-xs">A professional, ad-free experience is available on our Pro & Elite plans.</p><button id="sidebar-upgrade-btn" class="mt-4 text-sm font-medium bg-orange-600 px-3 py-1.5 rounded-md hover:bg-orange-500 transition-colors">Upgrade Now</button></div></div>
@@ -249,11 +285,10 @@
             messagingSenderId: "1055894597563",
             appId: "1:1055894597563:web:88c50b5907c4badc3b9e9e"
         };
-        const STRIPE_PUBLISHABLE_KEY = 'YOUR_STRIPE_PUBLISHABLE_KEY'; // REPLACE THIS
+        const STRIPE_PUBLISHABLE_KEY = 'YOUR_STRIPE_PUBLISHABLE_KEY'; 
         const ADMIN_EMAIL = "travisclevenger.tc@gmail.com";
-        const CRYPTO_GECKO_IDS = 'bitcoin,ethereum,solana,ripple,dogecoin,cardano,litecoin,chainlink,polkadot,avalanche-2'; // Coingecko IDs for top coins
-        const COINGECKO_API_URL = 'https://api.coingecko.com/api/v3/coins/markets';
-
+        const CRYPTOCOMPARE_API_KEY = 'YOUR_CRYPTOCOMPARE_API_KEY'; // Replace with your key
+        const CRYPTOCOMPARE_API_URL = 'https://min-api.cryptocompare.com/data/top/totalvolfull';
 
         // Secure Netlify Function Endpoints
         const FMP_PROXY_URL = '/.netlify/functions/options-flow';
@@ -312,7 +347,7 @@
             const userRef = doc(db, "users", user.uid);
             dbUnsubscribe = onSnapshot(userRef, async (docSnap) => {
                 if (!docSnap.exists()) {
-                    const newUser = { email: user.email, plan: user.email === ADMIN_EMAIL ? 'admin' : 'free', watchlist: ["SPY", "QQQ", "BTC"], alerts: [{ ticker: 'TSLA', premium: 250000 }], apiKey: `alphaflow-${crypto.randomUUID()}` };
+                    const newUser = { email: user.email, plan: user.email === ADMIN_EMAIL ? 'admin' : 'free', watchlist: ["SPY", "QQQ", "TSLA", "BTC"], alerts: [{ ticker: 'TSLA', premium: 1000000 }], apiKey: `alphaflow-${crypto.randomUUID()}` };
                     await setDoc(userRef, newUser);
                     currentUserData = newUser;
                 } else { currentUserData = docSnap.data(); }
@@ -325,7 +360,6 @@
             }, (error) => {
                 console.error("Firestore onSnapshot error:", error);
                 showAlertBanner("Error connecting to user database. Check Firestore rules and API key permissions.");
-                // If we can't get user data, we can't proceed. Show a critical error.
                  showInitializationError(`Firestore Error: ${error.message}. This is likely a permissions issue. Ensure your Firestore rules allow reads/writes and the API key is correct.`);
             });
         }
@@ -422,12 +456,7 @@
                     const searchTerm = e.target.value.toUpperCase().trim();
                      e.preventDefault();
                     if(!searchTerm) return;
-                    
-                    if (DOMElements.cryptoViewBtn.classList.contains('active')) {
-                       showChartView(searchTerm);
-                    } else {
-                       showChartView(searchTerm);
-                    }
+                    showChartView(searchTerm);
                 }
             });
 
@@ -488,8 +517,7 @@
             if (plan === 'free') { showAlertBanner("Charting is a premium feature. Please upgrade."); return; }
             
             let chartSymbol = ticker;
-            // Check if the ticker is a known crypto symbol
-            const isCrypto = currentCryptoData.some(c => c.symbol.toUpperCase() === ticker);
+            const isCrypto = currentCryptoData.some(c => c.CoinInfo.Name === ticker);
             if (isCrypto) {
                 chartSymbol = `COINBASE:${ticker}USD`;
             }
@@ -503,11 +531,11 @@
         function switchView(view) {
             ['flow', 'heatmap', 'crypto'].forEach(v => { DOMElements[`${v}ViewBtn`].classList.toggle('active', view === v); DOMElements[`${v}View`].classList.toggle('hidden', view !== v); });
             
-            const isCrypto = view === 'crypto';
-            DOMElements.optionsControls.classList.toggle('hidden', isCrypto);
-            DOMElements.flowFilters.classList.toggle('hidden', isCrypto);
-            DOMElements.cryptoControls.classList.toggle('hidden', !isCrypto);
-            DOMElements.marketStatusContainer.classList.toggle('hidden', isCrypto);
+            const isOptions = view === 'flow' || view === 'heatmap';
+            DOMElements.optionsControls.classList.toggle('hidden', !isOptions);
+            DOMElements.flowFilters.classList.toggle('hidden', !isOptions);
+            DOMElements.marketStatusContainer.classList.toggle('hidden', !isOptions);
+            DOMElements.cryptoControls.classList.toggle('hidden', isOptions);
             
             if (view === 'heatmap') renderHeatmap();
         }
@@ -554,10 +582,7 @@
                 .attr("x", 0)
                 .attr("y", (d, i) => i * 1.1 + "em")
                 .attr("dy", "-0.25em")
-                .attr("fill", d => {
-                    const bullishRatio = d.data.totalPremium > 0 ? d.data.bullishPremium / d.data.totalPremium : 0.5;
-                    return d3.lab(d3.interpolateRdYlGn(bullishRatio)).l < 60 ? "#fff" : "#000"
-                })
+                .attr("fill", "#fff")
                 .attr("font-weight", (d,i) => i === 0 ? "bold" : "normal")
                 .text(d => d);
         }
@@ -579,27 +604,33 @@
                  DOMElements.newsFeed.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">Upgrade to access the live news feed.</p>`;
             }
 
-            if (plan !== 'free' && getMarketStatus().isOpen) {
-                fetchAndRenderFlow();
-                flowInterval = setInterval(fetchAndRenderFlow, 90000); 
+            if (plan !== 'free') {
+                fetchAndRenderFlow(); // Fetch once immediately
+                flowInterval = setInterval(fetchAndRenderFlow, 60000); // Then every 60s
             } else {
-                 DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Market is currently closed. Live options flow will resume on open.</td></tr>`;
-                 if (plan === 'free') {
-                    DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Live options flow is a premium feature.<br>Please upgrade your plan.</td></tr>`;
-                 }
+                 DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-neutral-500 p-12">Live options flow is a premium feature.<br>Please upgrade your plan.</td></tr>`;
             }
         }
 
         function stopDataFetching() { if (flowInterval) clearInterval(flowInterval); if (newsInterval) clearInterval(newsInterval); if (cryptoInterval) clearInterval(cryptoInterval); }
 
-        async function fetchAndRenderFlow(ticker = null) {
+        async function fetchAndRenderFlow() {
             if (isPaused || document.hidden) return;
             const marketStatus = getMarketStatus();
-            if (!marketStatus.isOpen && !ticker) return;
+             if (!marketStatus.isOpen) {
+                DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-neutral-500 p-12">Market is currently closed. Live options flow will resume on open.</td></tr>`;
+                return;
+            }
 
-            DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest flow data...</td></tr>`;
-            const newData = await fetchOptionsFlowData(ticker);
-            if (newData) { currentFlowData = newData; renderFlowTable(); if (DOMElements.heatmapViewBtn.classList.contains('active')) renderHeatmap(); checkAlerts(newData); }
+            // For now, we use generated mock data. Replace with real fetch later.
+            const newData = generateMockOptionsFlow();
+            currentFlowData = [...newData, ...currentFlowData];
+            if (currentFlowData.length > 200) {
+                currentFlowData = currentFlowData.slice(0, 200);
+            }
+            renderFlowTable();
+            if (DOMElements.heatmapViewBtn.classList.contains('active')) renderHeatmap();
+            checkAlerts(newData);
         }
         
         async function fetchAndRenderNews() { if (isPaused || document.hidden) return; const newsData = await fetchNewsData(); if(newsData) { currentNewsData = newsData; renderNewsFeed(); } }
@@ -618,27 +649,45 @@
 
         function renderFlowTable() {
             const filteredData = getFilteredAndSortedData();
-            if (filteredData.length === 0 && getMarketStatus().isOpen) { DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity found for your criteria.</td></tr>`; return; }
-            if (filteredData.length === 0 && !getMarketStatus().isOpen) { DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Market is currently closed. Live options flow will resume on open.</td></tr>`; return;}
+            if (filteredData.length === 0 && getMarketStatus().isOpen) { DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-neutral-500 p-12">No unusual options activity found for your criteria.</td></tr>`; return; }
+            if (filteredData.length === 0 && !getMarketStatus().isOpen) { DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-neutral-500 p-12">Market is currently closed. Live options flow will resume on open.</td></tr>`; return;}
             if (filteredData.length === 0) return;
 
-            DOMElements.optionsTbody.innerHTML = filteredData.map(item => `
-                <tr class="fade-in cursor-pointer hover:bg-neutral-800/50 ${item.putCall === 'CALL' ? 'call-row' : 'put-row'}" data-ticker="${item.symbol}">
-                    <td class="p-2 text-neutral-400">${new Date(item.timestamp * 1000).toLocaleTimeString()}</td>
+            DOMElements.optionsTbody.innerHTML = filteredData.map(item => {
+                const isCall = item.putCall === 'CALL';
+                const sentimentClass = item.sentiment === 'BULLISH' ? 'text-green-400' : 'text-red-400';
+                const premiumClass = getPremiumColor(item.totalValue);
+                const volOiRatio = item.openInterest > 0 ? (item.volume / item.openInterest).toFixed(2) : '∞';
+                const volOiClass = (item.volume / item.openInterest) > 1.5 ? 'text-orange-400 font-bold' : '';
+
+                let badges = `<span class="badge ${item.tradeType === 'SWEEP' ? 'badge-sweep' : 'badge-block'}">${item.tradeType}</span>`;
+                if( (isCall && item.strikePrice > item.spot) || (!isCall && item.strikePrice < item.spot) ) {
+                    badges += `<span class="badge badge-otm">OTM</span>`;
+                } else {
+                    badges += `<span class="badge badge-itm">ITM</span>`;
+                }
+
+                return `
+                <tr class="fade-in cursor-pointer hover:bg-neutral-800/50" data-ticker="${item.symbol}">
+                    <td class="p-2 text-neutral-400">${new Date(item.timestamp).toLocaleTimeString()}</td>
                     <td class="p-2 font-semibold text-white">${item.symbol}</td>
                     <td class="p-2">
-                        <div class="font-semibold">${item.strikePrice.toFixed(2)} ${item.putCall}</div>
-                        <div class="text-neutral-400">${item.expiration}</div>
+                        <div>${item.expiration}</div>
+                        <div class="text-neutral-400 text-xs">${item.dte} DTE</div>
                     </td>
-                    <td class="p-2 font-semibold ${item.sentiment === 'BULLISH' ? 'text-green-400' : 'text-red-400'}">${item.sentiment}</td>
+                    <td class="p-2 text-right">${item.strikePrice.toFixed(2)}</td>
+                    <td class="p-2 font-semibold ${isCall ? 'text-green-400' : 'text-red-400'}">${item.putCall}</td>
                     <td class="p-2 text-right">
-                        <div class="font-mono font-semibold ${getPremiumColor(item.totalValue)}">${formatCurrency(item.totalValue)}</div>
-                        <div class="text-neutral-400 text-xs">${item.tradeType.replace(/_/g, ' ')}</div>
+                         <div class="font-mono font-semibold ${premiumClass}">
+                            ${item.totalValue >= 1000000 ? '🐋' : ''} ${formatCurrency(item.totalValue)}
+                         </div>
+                         <div class="text-xs">${badges}</div>
                     </td>
-                    <td class="p-2 text-right font-mono text-cyan-400" title="Vol: ${item.volume} / OI: ${item.openInterest}">
-                        <div>${item.volume} / ${item.openInterest}</div>
-                    </td>
-                </tr>`).join('');
+                    <td class="p-2 text-right text-cyan-400 font-mono">${item.spot.toFixed(2)}</td>
+                    <td class="p-2 text-right font-mono ${volOiClass}" title="Volume: ${item.volume} / OI: ${item.openInterest}">${volOiRatio}</td>
+                    <td class="p-2 text-right text-purple-400 font-mono">${item.iv.toFixed(2)}%</td>
+                </tr>`;
+                }).join('');
         }
         
         function renderNewsFeed() {
@@ -648,26 +697,28 @@
 
        function renderCryptoFlowTable() {
             if (!currentCryptoData || currentCryptoData.length === 0) {
-                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Could not fetch crypto data. Check API or network.</td></tr>`;
+                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Could not fetch crypto data. Check API key or network.</td></tr>`;
                 return;
             }
-            DOMElements.cryptoTbody.innerHTML = currentCryptoData.map(crypto => {
-                const change1h = crypto.price_change_percentage_1h_in_currency || 0;
-                const change24h = crypto.price_change_percentage_24h || 0;
-                const color1h = change1h >= 0 ? 'text-green-400' : 'text-red-400';
+            DOMElements.cryptoTbody.innerHTML = currentCryptoData.map(c => {
+                const coin = c.CoinInfo;
+                const display = c.DISPLAY?.USD;
+                if (!display) return ''; // Skip if there's no display data
+
+                const change24h = parseFloat(display.CHANGEPCT24HOUR);
                 const color24h = change24h >= 0 ? 'text-green-400' : 'text-red-400';
-                const symbol = crypto.symbol.toUpperCase();
+                
                 return `
-                    <tr class="fade-in cursor-pointer hover:bg-neutral-800/50" data-ticker="${symbol}">
+                    <tr class="fade-in cursor-pointer hover:bg-neutral-800/50" data-ticker="${coin.Name}">
                         <td class="p-2">
-                            <div class="font-semibold text-white">${crypto.name}</div>
-                            <div class="text-neutral-400">${symbol}</div>
+                            <div class="font-semibold text-white">${coin.FullName}</div>
+                            <div class="text-neutral-400">${coin.Name}</div>
                         </td>
-                        <td class="p-2 text-right font-mono">${crypto.current_price < 0.01 ? '$' + crypto.current_price.toFixed(6) : '$' + crypto.current_price.toFixed(2)}</td>
-                        <td class="p-2 text-right font-mono ${color1h}">${change1h.toFixed(2)}%</td>
-                        <td class="p-2 text-right font-mono ${color24h}">${change24h.toFixed(2)}%</td>
-                        <td class="p-2 text-right font-mono">${formatCurrency(crypto.total_volume)}</td>
-                        <td class="p-2 text-right font-mono">${formatCurrency(crypto.market_cap)}</td>
+                        <td class="p-2 text-right font-mono">${display.PRICE}</td>
+                        <td class="p-2 text-right font-mono ${color24h}">${display.CHANGEPCT24HOUR}%</td>
+                        <td class="p-2 text-right font-mono">${display.TOTALVOLUME24HTO}</td>
+                        <td class="p-2 text-right font-mono">${display.MKTCAP}</td>
+                        <td class="p-2 text-neutral-400">${display.LASTUPDATE} on ${display.LASTMARKET}</td>
                     </tr>`;
             }).join('');
         }
@@ -678,10 +729,13 @@
             if (activeFilter === 'bullish') data = data.filter(item => item.sentiment === 'BULLISH');
             if (activeFilter === 'bearish') data = data.filter(item => item.sentiment === 'BEARISH');
             if (activePremiumFilter > 0) data = data.filter(item => item.totalValue >= activePremiumFilter);
-            data.sort((a, b) => {
-                if (activeSort === 'totalValue-desc') return b.totalValue - a.totalValue;
-                return b.timestamp - a.timestamp;
-            });
+            
+            if (activeSort === 'totalValue-desc') {
+                data.sort((a, b) => b.totalValue - a.totalValue);
+            } else { // 'timestamp-desc'
+                data.sort((a, b) => b.timestamp - a.timestamp);
+            }
+            
             return data.slice(0, 150);
         }
 
@@ -697,21 +751,9 @@
             try { 
                 const r = await fetch(url, options); 
                 if (!r.ok) { 
-                    const rClone = r.clone();
-                    let errorBody;
-                    try { 
-                        errorBody = await r.json(); 
-                    } catch (e) { 
-                        errorBody = await rClone.text(); 
-                    }
-                    
-                    let friendlyMessage = `API ERROR: ${r.statusText}. Check console for details.`;
-                    if (r.status === 404) {
-                        friendlyMessage = `API FUNCTION NOT FOUND (404). Ensure Netlify build settings are correct.`;
-                    } else if (r.status === 429) {
-                        friendlyMessage = `API RATE LIMIT EXCEEDED. Please wait before trying again.`;
-                    }
-
+                    const errorBody = await r.json(); 
+                    let friendlyMessage = `API ERROR: ${errorBody.Message || r.statusText}.`;
+                    if (r.status === 401) friendlyMessage = 'API Key is invalid or missing.';
                     console.error(`API Error: ${r.status} ${r.statusText}`, errorBody);
                     DOMElements.apiStatusBanner.textContent = friendlyMessage;
                     DOMElements.apiStatusBanner.classList.remove('hidden'); 
@@ -727,12 +769,15 @@
             } 
         }
 
-        async function fetchOptionsFlowData(ticker = null) { let url = FMP_PROXY_URL; if (ticker) { url += `?symbol=${ticker}`; } return fetchApi(url); }
         async function fetchNewsData() { return fetchApi(NEWS_PROXY_URL); }
         async function fetchCryptoFlowData() { 
-            const url = `${COINGECKO_API_URL}?vs_currency=usd&ids=${CRYPTO_GECKO_IDS}&price_change_percentage=1h`;
+             if (!CRYPTOCOMPARE_API_KEY || CRYPTOCOMPARE_API_KEY === 'YOUR_CRYPTOCOMPARE_API_KEY') {
+                console.error("CryptoCompare API Key is missing.");
+                return null;
+            }
+            const url = `${CRYPTOCOMPARE_API_URL}?limit=20&tsym=USD&api_key=${CRYPTOCOMPARE_API_KEY}`;
             const result = await fetchApi(url);
-            return result;
+            return result ? result.Data : null;
         }
 
         function initiateStripeCheckout(priceId) {
@@ -741,11 +786,47 @@
             showAlertBanner(`Redirecting to Stripe for plan with Price ID: ${priceId}`);
         }
         
+        // --- Mock Data Generator for Options ---
+        function generateMockOptionsFlow() {
+            const tickers = ['TSLA', 'AAPL', 'NVDA', 'AMZN', 'GOOGL', 'MSFT', 'SPY', 'QQQ'];
+            const trades = [];
+            const numTrades = Math.floor(Math.random() * 5) + 2; // 2 to 6 new trades per tick
+            for(let i=0; i<numTrades; i++) {
+                const ticker = tickers[Math.floor(Math.random() * tickers.length)];
+                const spot = Math.random() * 500 + 100;
+                const putCall = Math.random() > 0.5 ? 'CALL' : 'PUT';
+                const strike = spot + (Math.random() - 0.5) * 50;
+                const dte = Math.floor(Math.random() * 90) + 1;
+                const expiration = new Date(Date.now() + dte * 86400000).toLocaleDateString('en-CA');
+                const totalValue = Math.floor(Math.random() * 2000000) + 25000;
+                const tradeType = Math.random() > 0.3 ? 'SWEEP' : 'BLOCK';
+                const volume = Math.floor(Math.random() * 5000) + 100;
+                const openInterest = Math.floor(Math.random() * 20000) + 500;
+                
+                trades.push({
+                    timestamp: Date.now(),
+                    symbol: ticker,
+                    expiration: expiration,
+                    dte: dte,
+                    strikePrice: strike,
+                    putCall: putCall,
+                    sentiment: (putCall === 'CALL') ? 'BULLISH' : 'BEARISH',
+                    totalValue: totalValue,
+                    tradeType: tradeType,
+                    spot: spot,
+                    volume: volume,
+                    openInterest: openInterest,
+                    iv: Math.random() * 150 + 20,
+                });
+            }
+            return trades;
+        }
+
         // --- Utilities ---
         function getMarketStatus() { const now = new Date(); const nowET = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' })); const day = nowET.getDay(); const hour = nowET.getHours(); const minute = nowET.getMinutes(); const isWeekday = day >= 1 && day <= 5; const marketTime = hour * 60 + minute; const openTime = 9 * 60 + 30; const closeTime = 16 * 60; if (isWeekday && marketTime >= openTime && marketTime < closeTime) { return { isOpen: true, nextEvent: 'close', time: (closeTime - marketTime) * 60 }; } let nextOpenDayIndex = (day === 5 && marketTime >= closeTime) ? 1 : (day === 6 ? 1 : (day === 0 ? 1 : (marketTime < openTime ? day : day + 1))); if(nextOpenDayIndex > 5) nextOpenDayIndex = 1; let daysUntilOpen = (nextOpenDayIndex - day + 7) % 7; if (daysUntilOpen === 0 && marketTime >= closeTime) { daysUntilOpen = day === 5 ? 3 : 1; } let nextOpen = new Date(nowET); nextOpen.setDate(nowET.getDate() + daysUntilOpen); nextOpen.setHours(9, 30, 0, 0); return { isOpen: false, nextEvent: 'open', time: nextOpen.getTime() - nowET.getTime() }; }
-        function updateMarketCountdown() { const status = getMarketStatus(); if (status.isOpen) { const seconds = status.time; const minutes = Math.floor(seconds / 60); const hours = Math.floor(minutes / 60); const remainingMinutes = minutes % 60; DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div><span class="font-semibold text-green-400">Market Open</span><span class="text-neutral-400">| Closes in ${hours}h ${remainingMinutes}m</span></div>`; if(DOMElements.optionsTbody.innerHTML.includes('Market is currently closed')) DOMElements.optionsTbody.innerHTML = '<tr><td colspan="6" class="text-center text-neutral-500 p-12">Awaiting options flow data...</td></tr>'; } else { const ms = status.time; const days = Math.floor(ms / (1000 * 60 * 60 * 24)); const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)); const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60)); const seconds = Math.floor((ms % (1000 * 60)) / 1000); DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-red-500 rounded-full"></div><span class="font-semibold text-red-400">Market Closed</span><span class="text-neutral-400">| Opens in ${days}d ${hours}h ${minutes}m ${seconds}s</span></div>`; DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Market is currently closed. Live options flow will resume on open.</td></tr>`; } }
-        const formatCurrency = (v) => v >= 1000000000 ? `$${(v/1000000000).toFixed(2)}b` : (v >= 1000000 ? `$${(v/1000000).toFixed(2)}m` : (v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v.toFixed(0)}`));
-        const getPremiumColor = (p) => p > 250000 ? 'text-orange-400' : (p > 100000 ? 'text-yellow-400' : '');
+        function updateMarketCountdown() { const status = getMarketStatus(); if (status.isOpen) { const seconds = status.time; const minutes = Math.floor(seconds / 60); const hours = Math.floor(minutes / 60); const remainingMinutes = minutes % 60; DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div><span class="font-semibold text-green-400">Market Open</span><span class="text-neutral-400">| Closes in ${hours}h ${remainingMinutes}m</span></div>`; if(DOMElements.optionsTbody.innerHTML.includes('Market is currently closed')) fetchAndRenderFlow(); } else { const ms = status.time; const days = Math.floor(ms / (1000 * 60 * 60 * 24)); const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)); const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60)); const seconds = Math.floor((ms % (1000 * 60)) / 1000); DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-red-500 rounded-full"></div><span class="font-semibold text-red-400">Market Closed</span><span class="text-neutral-400">| Opens in ${days}d ${hours}h ${minutes}m ${seconds}s</span></div>`; DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-neutral-500 p-12">Market is currently closed. Live options flow will resume on open.</td></tr>`; } }
+        const formatCurrency = (v) => v >= 1000000000 ? `$${(v/1000000000).toFixed(2)}B` : (v >= 1000000 ? `$${(v/1000000).toFixed(2)}M` : (v >= 1000 ? `$${(v/1000).toFixed(0)}K` : `$${v.toFixed(0)}`));
+        const getPremiumColor = (p) => p >= 1000000 ? 'text-orange-400' : (p >= 250000 ? 'text-yellow-400' : '');
         const timeAgo = (iso) => { if (!iso) return ''; const s = Math.floor((new Date() - new Date(iso)) / 1000); if (s < 0) return 'just now'; let i = s / 31536000; if (i > 1) return `${Math.floor(i)}y ago`; i = s / 2592000; if (i > 1) return `${Math.floor(i)}mo ago`; i = s / 86400; if (i > 1) return `${Math.floor(i)}d ago`; i = s / 3600; if (i > 1) return `${Math.floor(i)}h ago`; i = s / 60; if (i > 1) return `${Math.floor(i)}m ago`; return `${Math.floor(s)}s ago`; };
         const getFriendlyAuthError = (err) => { switch (err.code) { case 'auth/user-not-found': case 'auth/wrong-password': return 'Invalid email or password.'; case 'auth/email-already-in-use': return 'An account with this email already exists.'; case 'auth/popup-closed-by-user': return 'Sign-in window closed. Please try again.'; case 'auth/internal-error': return 'An internal authentication error occurred. Please try again later.' ; default: console.error("Authentication Error:", err); return 'An unexpected error occurred. Please try again.'; } };
         const togglePause = () => { isPaused = !isPaused; DOMElements.pausePlayBtn.innerHTML = isPaused ? '<i data-lucide="play-circle" class="w-4 h-4"></i><span>Resume</span>' : '<i data-lucide="pause-circle" class="w-4 h-4"></i><span>Pause</span>'; lucide.createIcons(); };
@@ -759,19 +840,16 @@
             DOMElements.pages = { dashboard: DOMElements.dashboardPage, plans: DOMElements.plansPage, account: DOMElements.accountPage, backtester: DOMElements.backtesterPage, chart: DOMElements.chartPage };
 
             try {
-                // --- Initialize Firebase ---
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
 
-                // --- Safely initialize Stripe ---
                 if (STRIPE_PUBLISHABLE_KEY && STRIPE_PUBLISHABLE_KEY !== 'YOUR_STRIPE_PUBLISHABLE_KEY') {
                     stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
                 } else {
                     console.warn("Stripe key is a placeholder. Payment functionality will be disabled.");
                 }
                 
-                // --- Setup Listeners ---
                 setupAuthListeners(); 
                 setupEventListeners(); 
                 lucide.createIcons(); 
