@@ -1,9 +1,6 @@
+# This configuration file is REQUIRED for Netlify to find and deploy your serverless functions.
+# Place this file in the root directory of your project.
+
 [build]
-  # This tells Netlify to look inside your "AlphaFlowUSA" folder
-
-
-  # This tells Netlify to publish the "index.html" it finds right there
-  publish = "."
-
-  # This tells Netlify to find the "netlify/functions" folder
+  # This tells Netlify where your serverless functions are located.
   functions = "netlify/functions"
