@@ -251,10 +251,11 @@
         };
         const STRIPE_PUBLISHABLE_KEY = 'YOUR_STRIPE_PUBLISHABLE_KEY'; // REPLACE THIS
         const ADMIN_EMAIL = "travisclevenger.tc@gmail.com";
-        const CRYPTO_IDS = '1,1027,5426,52,74,2010,2,1975,6636,5805'; // BTC, ETH, SOL, XRP, DOGE, ADA, LTC, LINK, DOT, AVAX
+        const CRYPTO_GECKO_IDS = 'bitcoin,ethereum,solana,ripple,dogecoin,cardano,litecoin,chainlink,polkadot,avalanche-2'; // Coingecko IDs for top coins
+        const COINGECKO_API_URL = 'https://api.coingecko.com/api/v3/coins/markets';
+
 
         // Secure Netlify Function Endpoints
-        const CMC_PROXY_URL = '/.netlify/functions/crypto';
         const FMP_PROXY_URL = '/.netlify/functions/options-flow';
         const NEWS_PROXY_URL = '/.netlify/functions/news';
 
@@ -488,7 +489,7 @@
             
             let chartSymbol = ticker;
             // Check if the ticker is a known crypto symbol
-            const isCrypto = currentCryptoData.some(c => c.symbol === ticker);
+            const isCrypto = currentCryptoData.some(c => c.symbol.toUpperCase() === ticker);
             if (isCrypto) {
                 chartSymbol = `COINBASE:${ticker}USD`;
             }
@@ -506,6 +507,7 @@
             DOMElements.optionsControls.classList.toggle('hidden', isCrypto);
             DOMElements.flowFilters.classList.toggle('hidden', isCrypto);
             DOMElements.cryptoControls.classList.toggle('hidden', !isCrypto);
+            DOMElements.marketStatusContainer.classList.toggle('hidden', isCrypto);
             
             if (view === 'heatmap') renderHeatmap();
         }
@@ -570,7 +572,7 @@
             if (plan !== 'free') {
                 fetchAndRenderCrypto();
                 fetchAndRenderNews();
-                cryptoInterval = setInterval(fetchAndRenderCrypto, 300000);
+                cryptoInterval = setInterval(fetchAndRenderCrypto, 300000); // Refresh every 5 minutes
                 newsInterval = setInterval(fetchAndRenderNews, 300000);
             } else {
                  DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Live crypto data is a premium feature.<br>Please upgrade your plan.</td></tr>`;
@@ -601,6 +603,7 @@
         }
         
         async function fetchAndRenderNews() { if (isPaused || document.hidden) return; const newsData = await fetchNewsData(); if(newsData) { currentNewsData = newsData; renderNewsFeed(); } }
+        
         async function fetchAndRenderCrypto() { 
             if (isPaused || document.hidden) return;
             DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest crypto data...</td></tr>`;
@@ -609,7 +612,7 @@
                 currentCryptoData = data;
                 renderCryptoFlowTable();
             } else {
-                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Could not fetch crypto data.</td></tr>`;
+                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-red-400 p-12">Error: Could not fetch crypto data from the API.</td></tr>`;
             }
         }
 
@@ -645,26 +648,26 @@
 
        function renderCryptoFlowTable() {
             if (!currentCryptoData || currentCryptoData.length === 0) {
-                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Could not fetch crypto data.</td></tr>`;
+                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Could not fetch crypto data. Check API or network.</td></tr>`;
                 return;
             }
             DOMElements.cryptoTbody.innerHTML = currentCryptoData.map(crypto => {
-                const quote = crypto.quote.USD;
-                const change1h = quote.percent_change_1h;
-                const change24h = quote.percent_change_24h;
+                const change1h = crypto.price_change_percentage_1h_in_currency || 0;
+                const change24h = crypto.price_change_percentage_24h || 0;
                 const color1h = change1h >= 0 ? 'text-green-400' : 'text-red-400';
                 const color24h = change24h >= 0 ? 'text-green-400' : 'text-red-400';
+                const symbol = crypto.symbol.toUpperCase();
                 return `
-                    <tr class="fade-in cursor-pointer hover:bg-neutral-800/50" data-ticker="${crypto.symbol}">
+                    <tr class="fade-in cursor-pointer hover:bg-neutral-800/50" data-ticker="${symbol}">
                         <td class="p-2">
                             <div class="font-semibold text-white">${crypto.name}</div>
-                            <div class="text-neutral-400">${crypto.symbol}</div>
+                            <div class="text-neutral-400">${symbol}</div>
                         </td>
-                        <td class="p-2 text-right font-mono">${quote.price < 0.01 ? '$' + quote.price.toFixed(6) : '$' + quote.price.toFixed(2)}</td>
+                        <td class="p-2 text-right font-mono">${crypto.current_price < 0.01 ? '$' + crypto.current_price.toFixed(6) : '$' + crypto.current_price.toFixed(2)}</td>
                         <td class="p-2 text-right font-mono ${color1h}">${change1h.toFixed(2)}%</td>
                         <td class="p-2 text-right font-mono ${color24h}">${change24h.toFixed(2)}%</td>
-                        <td class="p-2 text-right font-mono">${formatCurrency(quote.volume_24h)}</td>
-                        <td class="p-2 text-right font-mono">${formatCurrency(quote.market_cap)}</td>
+                        <td class="p-2 text-right font-mono">${formatCurrency(crypto.total_volume)}</td>
+                        <td class="p-2 text-right font-mono">${formatCurrency(crypto.market_cap)}</td>
                     </tr>`;
             }).join('');
         }
@@ -705,6 +708,8 @@
                     let friendlyMessage = `API ERROR: ${r.statusText}. Check console for details.`;
                     if (r.status === 404) {
                         friendlyMessage = `API FUNCTION NOT FOUND (404). Ensure Netlify build settings are correct.`;
+                    } else if (r.status === 429) {
+                        friendlyMessage = `API RATE LIMIT EXCEEDED. Please wait before trying again.`;
                     }
 
                     console.error(`API Error: ${r.status} ${r.statusText}`, errorBody);
@@ -724,7 +729,11 @@
 
         async function fetchOptionsFlowData(ticker = null) { let url = FMP_PROXY_URL; if (ticker) { url += `?symbol=${ticker}`; } return fetchApi(url); }
         async function fetchNewsData() { return fetchApi(NEWS_PROXY_URL); }
-        async function fetchCryptoFlowData() { const url = `${CMC_PROXY_URL}?id=${CRYPTO_IDS}`; const result = await fetchApi(url); return result ? Object.values(result.data) : null; }
+        async function fetchCryptoFlowData() { 
+            const url = `${COINGECKO_API_URL}?vs_currency=usd&ids=${CRYPTO_GECKO_IDS}&price_change_percentage=1h`;
+            const result = await fetchApi(url);
+            return result;
+        }
 
         function initiateStripeCheckout(priceId) {
             if (!stripe) { showAlertBanner("Stripe is not configured. Please add a valid publishable key."); return; }
@@ -785,3 +794,4 @@
     </script>
 </body>
 </html>
+
