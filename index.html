@@ -22,7 +22,7 @@
     <script src="https://js.stripe.com/v3/"></script>
     
     <!-- D3.js for Heatmap -->
-    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/d7.min.js"></script>
     
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #e5e7eb; }
@@ -535,9 +535,10 @@
         
         function renderHeatmap() {
             const container = d3.select("#heatmap-container");
-            container.html('');
+            container.html('<p class="text-neutral-500 text-center p-8">Generating heatmap...</p>');
+
             if (currentFlowData.length === 0) {
-                container.append('p').attr('class', 'text-neutral-500 text-center').text('No data for heatmap.');
+                container.html('<p class="text-neutral-500 text-center p-8">No options flow data available to generate heatmap.</p>');
                 return;
             }
 
@@ -546,7 +547,6 @@
                 v => ({
                     totalPremium: d3.sum(v, d => d.totalValue),
                     bullishPremium: d3.sum(v.filter(d => d.sentiment === 'BULLISH'), d => d.totalValue),
-                    bearishPremium: d3.sum(v.filter(d => d.sentiment === 'BEARISH'), d => d.totalValue),
                     count: v.length
                 }),
                 d => d.symbol
@@ -557,6 +557,7 @@
             const pack = d3.pack().size([width, height]).padding(5);
             const root = pack(d3.hierarchy({ children: aggregatedData }).sum(d => d.totalPremium));
             
+            container.html(''); // Clear loading message
             const svg = container.append("svg").attr("width", width).attr("height", height).attr("font-size", 10).attr("text-anchor", "middle");
             const g = svg.selectAll("g").data(root.leaves()).enter().append("g").attr("class", "heatmap-bubble").attr("transform", d => `translate(${d.x},${d.y})`).on("click", (event, d) => showChartView(d.data.symbol));
 
@@ -590,7 +591,7 @@
             if (plan !== 'free') {
                 fetchAndRenderCrypto();
                 fetchAndRenderNews();
-                cryptoInterval = setInterval(fetchAndRenderCrypto, 120000); // Refresh every 2 minutes
+                cryptoInterval = setInterval(fetchAndRenderCrypto, 120000); 
                 newsInterval = setInterval(fetchAndRenderNews, 300000);
             } else {
                  DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Live crypto data is a premium feature.<br>Please upgrade your plan.</td></tr>`;
@@ -599,7 +600,7 @@
 
             if (plan !== 'free') {
                 fetchAndRenderFlow(); 
-                flowInterval = setInterval(fetchAndRenderFlow, 60000); // Refresh every 60s
+                flowInterval = setInterval(fetchAndRenderFlow, 60000);
             } else {
                  DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-neutral-500 p-12">Live options flow is a premium feature.<br>Please upgrade your plan.</td></tr>`;
             }
@@ -609,11 +610,19 @@
 
         async function fetchAndRenderFlow() {
             if (isPaused || document.hidden) return;
+            DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-neutral-500 p-12">Fetching latest options flow...</td></tr>`;
             
             const rawData = await fetchApi(FMP_PROXY_URL);
-            if (!rawData || !Array.isArray(rawData)) {
-                DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-red-400 p-12">Failed to fetch options flow data. Check API proxy and key.</td></tr>`;
+            
+            if (!rawData) {
+                // fetchApi handles the error banner, so we just stop.
+                DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-red-400 p-12">Failed to fetch options flow data. Check API status banner at the top.</td></tr>`;
                 return;
+            }
+
+            if (!Array.isArray(rawData) || rawData.length === 0) {
+                 DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-neutral-500 p-12">No unusual options activity detected in the last minute. Awaiting new trades...</td></tr>`;
+                 return;
             }
 
             const newData = rawData.map(transformOptionsData);
@@ -638,33 +647,33 @@
             }
         }
 
-        // --- Data Transformation ---
+        // --- Data Transformation (Robust) ---
         function transformOptionsData(apiTrade) {
-             const expirationDate = new Date(apiTrade.expiration);
+             const expirationDate = new Date(apiTrade.expiration || 0);
              const today = new Date();
              const dte = Math.round((expirationDate - today) / (1000 * 60 * 60 * 24));
 
             return {
-                timestamp: new Date(apiTrade.timestamp).getTime(),
-                symbol: apiTrade.symbol,
-                expiration: apiTrade.expiration,
-                dte: dte,
-                strikePrice: apiTrade.strikePrice,
-                putCall: apiTrade.putCall,
-                sentiment: apiTrade.sentiment,
-                totalValue: apiTrade.totalValue,
-                tradeType: apiTrade.tradeType,
-                spot: apiTrade.stockPrice,
-                volume: apiTrade.volume,
-                openInterest: apiTrade.openInterest,
-                iv: apiTrade.iv * 100, // Assuming IV is decimal
+                timestamp: new Date(apiTrade.timestamp || Date.now()).getTime(),
+                symbol: apiTrade.symbol || 'N/A',
+                expiration: apiTrade.expiration || 'N/A',
+                dte: dte >= 0 ? dte : 0,
+                strikePrice: apiTrade.strikePrice || 0,
+                putCall: apiTrade.putCall || 'N/A',
+                sentiment: apiTrade.sentiment || 'NEUTRAL',
+                totalValue: apiTrade.totalValue || 0,
+                tradeType: apiTrade.tradeType || 'TRADE',
+                spot: apiTrade.stockPrice || 0,
+                volume: apiTrade.volume || 0,
+                openInterest: apiTrade.openInterest || 0,
+                iv: (apiTrade.iv || 0) * 100,
             };
         }
 
         function renderFlowTable() {
             const filteredData = getFilteredAndSortedData();
             if (filteredData.length === 0) { 
-                DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-neutral-500 p-12">No unusual options activity found for your criteria.</td></tr>`; 
+                DOMElements.optionsTbody.innerHTML = `<tr><td colspan="9" class="text-center text-neutral-500 p-12">No results for the current filters.</td></tr>`; 
                 return; 
             }
 
@@ -760,10 +769,11 @@
         async function fetchApi(url, options = {}) { 
             try { 
                 const r = await fetch(url, options); 
-                if (!r.ok) { 
-                    const errorBody = await r.json(); 
+                if (!r.ok) {
+                    let errorBody;
+                    try { errorBody = await r.json(); } catch (e) { errorBody = { message: await r.text() }; }
                     let friendlyMessage = `API ERROR: ${errorBody.message || r.statusText}.`;
-                    console.error(`API Error: ${r.status} ${r.statusText}`, errorBody);
+                    console.error(`API Error on ${url}: ${r.status} ${r.statusText}`, errorBody);
                     DOMElements.apiStatusBanner.textContent = friendlyMessage;
                     DOMElements.apiStatusBanner.classList.remove('hidden'); 
                     return null; 
@@ -771,8 +781,8 @@
                 DOMElements.apiStatusBanner.classList.add('hidden'); 
                 return r.json(); 
             } catch (e) { 
-                console.error(`Fetch error:`, e);
-                DOMElements.apiStatusBanner.textContent = 'NETWORK ERROR. Could not connect to API.';
+                console.error(`Fetch error for ${url}:`, e);
+                DOMElements.apiStatusBanner.textContent = 'NETWORK ERROR. Could not connect to API. Check network connection.';
                 DOMElements.apiStatusBanner.classList.remove('hidden'); 
                 return null; 
             } 
