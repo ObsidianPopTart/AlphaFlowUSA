@@ -1,0 +1,9 @@
+[build]
+  # This tells Netlify to look inside your "AlphaFlowUSA" folder
+
+
+  # This tells Netlify to publish the "index.html" it finds right there
+  publish = "."
+
+  # This tells Netlify to find the "netlify/functions" folder
+  functions = "netlify/functions"
