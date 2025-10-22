@@ -60,6 +60,8 @@
         .call-row { border-left: 3px solid #22c55e; }
         .put-row { border-left: 3px solid #ef4444; }
         #options-tbody tr:first-child { /* Style first row differently if needed */ }
+        /* Styles for the new after-hours section */
+        #aftermarket-flow-view { max-height: 300px; overflow-y: auto; } /* Limit height and add scroll */
     </style>
 </head>
 <body class="text-sm">
@@ -127,7 +129,7 @@
                                  </div>
                              </div>
                              <div id="crypto-controls" class="hidden flex items-center justify-between gap-3"><h2 class="text-xl font-bold text-white">Crypto Flow</h2></div>
-                             <!-- NEW Heatmap specific controls -->
+                             <!-- Heatmap specific controls -->
                              <div id="heatmap-controls" class="hidden flex items-center justify-center gap-2 mt-2">
                                 <span class="text-xs text-neutral-400 font-medium mr-2">Heatmap Data:</span>
                                 <button data-heatmap-filter="options" class="heatmap-filter-button active px-3 py-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 transition-colors text-xs">Options</button>
@@ -135,16 +137,34 @@
                              </div>
                         </div>
                         <div id="market-status-container" class="p-3 text-center border-b border-neutral-800"></div>
+                        
+                        <!-- Main Unusual Options Flow View -->
                         <div id="flow-view" class="flex-grow overflow-y-auto">
                             <table class="w-full text-left text-xs">
                                 <thead class="sticky-header text-neutral-400 uppercase bg-neutral-900"><tr><th class="p-2">Time</th><th class="p-2">Ticker</th><th class="p-2">Details</th><th class="p-2">Sentiment</th><th class="p-2 text-right">Premium</th><th class="p-2 text-right">Vol / OI</th></tr></thead>
                                 <tbody id="options-tbody" class="divide-y divide-neutral-800">
-                                    <!-- Rows will be prepended here by JS -->
                                     <tr id="flow-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Initializing flow...</td></tr>
                                 </tbody>
                             </table>
                         </div>
+
+                        <!-- NEW After-Hours Trade View (Initially Hidden) -->
+                        <div id="aftermarket-flow-view" class="hidden p-3 border-t border-neutral-800">
+                             <h3 class="text-sm font-semibold text-neutral-300 mb-2 text-center">Latest After-Hours Trades (Major Tickers)</h3>
+                             <div class="max-h-48 overflow-y-auto"> <!-- Limit height and scroll -->
+                                <table class="w-full text-left text-xs">
+                                    <thead class="sticky-header text-neutral-400 uppercase bg-neutral-900 text-xs">
+                                        <tr><th class="p-1.5">Time</th><th class="p-1.5">Ticker</th><th class="p-1.5 text-right">Price</th><th class="p-1.5 text-right">Size</th><th class="p-1.5 text-right">Premium</th></tr>
+                                    </thead>
+                                    <tbody id="aftermarket-options-tbody" class="divide-y divide-neutral-800">
+                                        <tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">Fetching after-hours trades...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                          <div id="heatmap-view" class="hidden flex-grow p-4 flex items-center justify-center"><div id="heatmap-container" class="w-full h-full max-w-full max-h-full"></div></div>
+                         
                          <div id="crypto-view" class="hidden flex-grow overflow-y-auto">
                             <table class="w-full text-left text-xs">
                                 <thead class="sticky-header text-neutral-400 uppercase bg-neutral-900"><tr><th class="p-2">Name</th><th class="p-2 text-right">Price</th><th class="p-2 text-right">1h %</th><th class="p-2 text-right">24h %</th><th class="p-2 text-right">24h Volume</th><th class="p-2 text-right">Market Cap</th></tr></thead>
@@ -259,7 +279,7 @@
         // Firebase Imports (v11.6.1)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"; // Added setLogLevel
         
         // --- Configuration ---
         const firebaseConfig = {
@@ -273,20 +293,23 @@
         const STRIPE_PUBLISHABLE_KEY = 'YOUR_STRIPE_PUBLISHABLE_KEY'; // REPLACE THIS
         const ADMIN_EMAIL = "travisclevenger.tc@gmail.com";
         const CRYPTO_LIMIT = 100; // Fetch Top 100 Cryptos
-        const MAX_FLOW_ROWS = 150; // Max rows to keep in the flow table
+        const MAX_FLOW_ROWS = 150; // Max rows to keep in the main flow table
+        const MAX_AFTERMARKET_ROWS = 50; // Max rows for aftermarket table
 
         // Secure Netlify Function Endpoints
-        // These URLs MUST match your file structure: netlify/functions/FUNCTION-NAME
         const CMC_PROXY_URL = '/.netlify/functions/crypto';
         const FMP_PROXY_URL = '/.netlify/functions/options-flow';
+        const FMP_AFTERMARKET_PROXY_URL = '/.netlify/functions/options-flow-aftermarket'; // New endpoint
         const NEWS_PROXY_URL = '/.netlify/functions/news';
 
         // --- App State ---
         let app, auth, db;
         let stripe;
         let flowInterval, newsInterval, cryptoInterval, dbUnsubscribe, marketCountdownInterval;
+        let aftermarketFlowInterval; // New interval timer for after hours
         let currentFlowData = [], currentNewsData = [], currentCryptoData = [];
-        let displayedFlowTimestamps = new Set(); // Keep track of displayed trades for smooth updates
+        let currentAftermarketData = []; // New array for after-hours trades
+        let displayedFlowItems = new Set(); // Use a generic name for tracking displayed items (both main and aftermarket)
         let userWatchlist = new Set(), userAlerts = [];
         let isPaused = false;
         let activeFilter = 'all', activeSort = 'timestamp-desc', activePremiumFilter = 0;
@@ -296,6 +319,7 @@
         let authReady = false;
         let initialFlowLoadComplete = false;
         let initialCryptoLoadComplete = false;
+        let initialAftermarketLoadComplete = false; // New flag
 
         // --- Error Handling for Initialization ---
         function showInitializationError(message) {
@@ -363,14 +387,13 @@
             DOMElements.mainAppContent.classList.add('flex', 'flex-col');
             setActivePage('dashboard'); 
             renderHeader(); 
-            updateUIForPlan(); 
-            startDataFetching(); // This now initiates fetches
+            updateUIForPlan(); // This will call startDataFetching()
             renderWatchlist(); 
             renderAlerts(); 
             lucide.createIcons();
             if(marketCountdownInterval) clearInterval(marketCountdownInterval);
             marketCountdownInterval = setInterval(updateMarketCountdown, 1000);
-            updateMarketCountdown();
+            updateMarketCountdown(); // Initial call to set status and start correct fetch loops
         }
 
         function handleSignedOutState() {
@@ -378,13 +401,16 @@
             if(marketCountdownInterval) clearInterval(marketCountdownInterval);
             currentUserData = null;
             currentUser = null;
-            stopDataFetching();
-            initialFlowLoadComplete = false; // Reset flags
+            stopDataFetching(); // Ensure all intervals are stopped
+            initialFlowLoadComplete = false; 
             initialCryptoLoadComplete = false;
-            displayedFlowTimestamps.clear(); // Clear displayed items tracking
+            initialAftermarketLoadComplete = false; // Reset new flag
+            displayedFlowItems.clear(); 
             if (DOMElements) {
                 // Clear tables and show placeholders on sign out
                 DOMElements.optionsTbody.innerHTML = '<tr id="flow-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Sign in to view flow.</td></tr>';
+                DOMElements.aftermarketOptionsTbody.innerHTML = '<tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">Sign in to view flow.</td></tr>'; // Clear aftermarket table too
+                DOMElements.aftermarketFlowView.classList.add('hidden'); // Hide aftermarket section
                 DOMElements.cryptoTbody.innerHTML = '<tr id="crypto-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Sign in to view crypto data.</td></tr>';
                 DOMElements.heatmapContainer.innerHTML = '<p class="text-neutral-500 text-center">Sign in to view heatmap.</p>';
                 DOMElements.newsFeed.innerHTML = '<p class="text-center text-neutral-500 p-8 text-xs">Sign in to view news.</p>';
@@ -447,15 +473,35 @@
             document.getElementById('footer-contact-link').addEventListener('click', e => { e.preventDefault(); showModal('contact'); });
             document.querySelector('[data-close-modal]').addEventListener('click', () => DOMElements.genericModal.classList.add('hidden'));
             DOMElements.pausePlayBtn.addEventListener('click', togglePause);
-            DOMElements.flowFilters.addEventListener('click', handleFilterClick); // Existing filters
-            DOMElements.sortSelect.addEventListener('change', e => { activeSort = e.target.value; updateFlowTable(); }); // Update sorting
-            DOMElements.premiumSelect.addEventListener('change', e => { activePremiumFilter = parseInt(e.target.value); updateFlowTable(); }); // Update premium filter
             
+            // Modify flow filter click to use updateFlowTable for full re-render
+            DOMElements.flowFilters.addEventListener('click', (e) => {
+                 const btn = e.target.closest('.control-button'); 
+                 if(btn){ 
+                     document.querySelectorAll('.control-button').forEach(b => b.classList.remove('active')); 
+                     btn.classList.add('active'); 
+                     activeFilter = btn.id.replace('filter-', ''); 
+                     updateFlowTable(); // Call updateFlowTable to apply filter to current data
+                 }
+             }); 
+            
+            // Modify sort select change to use updateFlowTable
+             DOMElements.sortSelect.addEventListener('change', e => { 
+                 activeSort = e.target.value; 
+                 updateFlowTable(); // Call updateFlowTable to apply sort
+             });
+
+            // Modify premium select change to use updateFlowTable
+             DOMElements.premiumSelect.addEventListener('change', e => { 
+                 activePremiumFilter = parseInt(e.target.value); 
+                 updateFlowTable(); // Call updateFlowTable to apply filter
+             });
+
              // View switching
             document.querySelectorAll('.view-button').forEach(button => {
                 button.addEventListener('click', () => switchView(button.dataset.view));
             });
-            // NEW Heatmap filter switching
+            // Heatmap filter switching
             document.querySelectorAll('.heatmap-filter-button').forEach(button => {
                  button.addEventListener('click', () => {
                      document.querySelectorAll('.heatmap-filter-button').forEach(btn => btn.classList.remove('active'));
@@ -480,6 +526,7 @@
             DOMElements.accountChangePlanBtn.addEventListener('click', () => setActivePage('plans'));
             DOMElements.sidebarUpgradeBtn.addEventListener('click', () => setActivePage('plans'));
             DOMElements.backtesterUpgradeBtn.addEventListener('click', () => setActivePage('plans'));
+            
             // Use event delegation for dynamically added rows
             DOMElements.optionsTbody.addEventListener('click', e => { 
                 const row = e.target.closest('tr');
@@ -493,6 +540,14 @@
                      showChartView(row.dataset.ticker); 
                 }
              });
+            // Add event delegation for NEW aftermarket table
+             DOMElements.aftermarketOptionsTbody.addEventListener('click', e => { 
+                const row = e.target.closest('tr');
+                if (row && row.dataset.ticker) {
+                     showChartView(row.dataset.ticker); 
+                }
+             });
+
             DOMElements.backToDashboardChart.addEventListener('click', () => DOMElements.pages.chart.classList.add('hidden'));
             document.querySelectorAll('.plan-button').forEach(button => button.addEventListener('click', () => initiateStripeCheckout(button.dataset.priceId)));
             DOMElements.adminPlanSelector.addEventListener('change', () => { updateUIForPlan(); renderHeader(); });
@@ -578,28 +633,36 @@
             
             const isCryptoView = view === 'crypto';
             const isHeatmapView = view === 'heatmap';
+            const isFlowView = view === 'flow';
 
-            DOMElements.optionsControls.classList.toggle('hidden', isCryptoView || isHeatmapView);
-            DOMElements.flowFilters.classList.toggle('hidden', isCryptoView || isHeatmapView);
+            DOMElements.optionsControls.classList.toggle('hidden', !isFlowView);
+            DOMElements.flowFilters.classList.toggle('hidden', !isFlowView);
             DOMElements.cryptoControls.classList.toggle('hidden', !isCryptoView);
             DOMElements.heatmapControls.classList.toggle('hidden', !isHeatmapView); // Show heatmap controls only for heatmap view
             
+            // Show/Hide aftermarket flow view based on market status IF flow view is active
+            if(isFlowView) {
+                const marketStatus = getMarketStatus();
+                DOMElements.aftermarketFlowView.classList.toggle('hidden', marketStatus.isOpen);
+            } else {
+                 DOMElements.aftermarketFlowView.classList.add('hidden'); // Always hide if not in flow view
+            }
+
             if (view === 'heatmap') {
                 // Use requestAnimationFrame to ensure the container is visible and has dimensions
                  requestAnimationFrame(renderHeatmap);
             }
         }
         
-        function renderHeatmap() {
+       function renderHeatmap() {
              const container = d3.select("#heatmap-container");
              container.html(''); // Clear previous heatmap
 
             let dataToUse = [];
-            let valueAccessor = d => d.totalPremium; // Default for options
-            let colorInterpolator = d3.interpolateRdYlGn; // Default for options (Red-Yellow-Green)
-            let colorValueAccessor = d => d.totalPremium > 0 ? d.bullishPremium / d.totalPremium : 0.5; // Options sentiment ratio
+            let valueAccessor = d => d.totalPremium; 
             let symbolAccessor = d => d.symbol;
-            let nameAccessor = d => d.symbol; // Default to symbol if name isn't available
+            let nameAccessor = d => d.symbol; 
+            let colorAccessor; // Function to determine fill color based on type
 
              if (activeHeatmapFilter === 'options') {
                  if (!initialFlowLoadComplete) {
@@ -619,9 +682,18 @@
                      }),
                      d => d.symbol
                  ).map(([key, value]) => ({ symbol: key, ...value }));
+                 
                  valueAccessor = d => d.totalPremium;
-                 colorValueAccessor = d => d.totalPremium > 0 ? d.bullishPremium / d.totalPremium : 0.5;
-                 colorInterpolator = d3.interpolateRdYlGn;
+                 symbolAccessor = d => d.symbol;
+                 nameAccessor = d => d.symbol;
+                 // **UPDATED** Color logic for options: Green/Red/Gray based on bullish ratio
+                 colorAccessor = d => {
+                     if (d.totalPremium === 0) return '#a3a3a3'; // Gray for neutral/zero
+                     const bullishRatio = d.bullishPremium / d.totalPremium;
+                     if (bullishRatio > 0.5) return '#22c55e'; // Green
+                     if (bullishRatio < 0.5) return '#ef4444'; // Red
+                     return '#a3a3a3'; // Gray for exactly 50%
+                 };
 
              } else { // Crypto
                   if (!initialCryptoLoadComplete) {
@@ -639,13 +711,14 @@
                      change24h: c.quote.USD.percent_change_24h
                  }));
                  valueAccessor = d => d.volume24h; // Size bubbles by 24h volume
-                 colorValueAccessor = d => d.change24h; // Color bubbles by 24h change
-                 // Use a Green/Red scale for crypto price change
-                 colorInterpolator = d3.scaleLinear().domain([-5, 0, 5]) // Example range: -5% to +5% change
-                                        .range(["#ef4444", "#a3a3a3", "#22c55e"]) // Red -> Gray -> Green
-                                        .clamp(true); 
                  symbolAccessor = d => d.symbol;
                  nameAccessor = d => d.name;
+                  // Color bubbles by 24h change (Green/Red/Gray)
+                 colorAccessor = d => {
+                    if (d.change24h > 0) return '#22c55e'; // Green
+                    if (d.change24h < 0) return '#ef4444'; // Red
+                    return '#a3a3a3'; // Gray for zero change
+                 };
              }
 
              if (dataToUse.length === 0) {
@@ -661,21 +734,20 @@
              const height = bounds.height;
               if (width <= 0 || height <= 0) {
                  console.warn("Heatmap container has no dimensions yet.");
-                 // Optionally, try again slightly later
-                 // requestAnimationFrame(renderHeatmap); 
                  return; 
              }
 
 
              const pack = d3.pack().size([width, height]).padding(5);
-             const root = pack(d3.hierarchy({ children: dataToUse }).sum(valueAccessor));
+             // Ensure valueAccessor returns a positive number for packing
+             const root = pack(d3.hierarchy({ children: dataToUse }).sum(d => Math.max(1, valueAccessor(d) || 0))); // Use Math.max(1,...) to avoid zero/negative radius
              
              const svg = container.append("svg").attr("width", width).attr("height", height).attr("font-size", 10).attr("text-anchor", "middle");
 
              // Tooltip
-             const tooltip = container.append("div")
+             const tooltip = d3.select("body").append("div") // Append to body to avoid clipping
                 .style("opacity", 0)
-                .attr("class", "absolute bg-neutral-900 border border-neutral-700 rounded-md p-2 text-xs shadow-lg pointer-events-none z-10");
+                .attr("class", "absolute bg-neutral-900 border border-neutral-700 rounded-md p-2 text-xs shadow-lg pointer-events-none z-[70]"); // Ensure high z-index
 
 
              const g = svg.selectAll("g")
@@ -688,7 +760,7 @@
                      tooltip.transition().duration(200).style("opacity", .9);
                      let tooltipText = `<b>${symbolAccessor(d.data)}</b> (${nameAccessor(d.data)})<br/>`;
                      if (activeHeatmapFilter === 'options') {
-                         tooltipText += `Premium: ${formatCurrency(d.data.totalPremium)}<br/>Sentiment: ${((d.data.bullishPremium / d.data.totalPremium)*100).toFixed(0)}% Bullish`;
+                         tooltipText += `Premium: ${formatCurrency(d.data.totalPremium)}<br/>Sentiment: ${d.data.totalPremium > 0 ? ((d.data.bullishPremium / d.data.totalPremium)*100).toFixed(0) : 'N/A'}% Bullish`;
                      } else {
                           tooltipText += `Volume (24h): ${formatCurrency(d.data.volume24h)}<br/>Change (24h): ${d.data.change24h.toFixed(2)}%`;
                      }
@@ -702,7 +774,7 @@
 
              g.append("circle")
                  .attr("r", d => d.r)
-                 .attr("fill", d => colorInterpolator(colorValueAccessor(d.data)))
+                 .attr("fill", d => colorAccessor(d.data)) // Use the unified colorAccessor
                  .attr("stroke", "#4a4a4a")
                  .attr("stroke-width", 1.5);
 
@@ -721,9 +793,10 @@
                  .enter().append("tspan")
                  .attr("x", 0)
                  .attr("y", (d, i, nodes) => `${i - nodes.length / 2 + 0.8}em`) // Center text vertically
-                 .attr("fill", d => { // Adjust text color for contrast
-                      const color = d3.color(colorInterpolator(colorValueAccessor(d.data)));
-                      return color && d3.lab(color).l < 60 ? "#fff" : "#333";
+                 .attr("fill", d => { // Adjust text color for contrast (simple light/dark check)
+                      const color = d3.color(colorAccessor(d.data));
+                      // Use white text for dark backgrounds (like red/green) and dark text for light (like gray if it was lighter)
+                      return color && d3.lab(color).l < 60 ? "#fff" : "#eee"; // Prefer light text on colored backgrounds
                  })
                  .attr("font-weight", (d,i) => i === 0 ? "bold" : "normal")
                  .style("font-size", d => d.r < 15 ? '8px' : '10px') // Smaller font for smaller bubbles
@@ -732,57 +805,74 @@
         
         // --- Data Fetching & Rendering ---
         function startDataFetching() {
-            stopDataFetching(); // Clear existing intervals
-            initialFlowLoadComplete = false; // Reset load flags
-            initialCryptoLoadComplete = false;
-            // Clear existing data only if needed, or handle updates smoothly
-            // currentFlowData = []; 
-            // currentCryptoData = [];
-            // currentNewsData = [];
-            // displayedFlowTimestamps.clear();
-
-            // Clear placeholders immediately
-            const flowPlaceholder = document.getElementById('flow-placeholder');
-            if (flowPlaceholder) flowPlaceholder.remove();
-            const cryptoPlaceholder = document.getElementById('crypto-placeholder');
+             stopDataFetching(); // Clear existing intervals
+             initialFlowLoadComplete = false; 
+             initialCryptoLoadComplete = false;
+             initialAftermarketLoadComplete = false; // Reset aftermarket flag too
+             
+             // Clear placeholders
+             const flowPlaceholder = document.getElementById('flow-placeholder');
+             if (flowPlaceholder) flowPlaceholder.remove();
+             const cryptoPlaceholder = document.getElementById('crypto-placeholder');
              if (cryptoPlaceholder) cryptoPlaceholder.remove();
+             const aftermarketPlaceholder = document.getElementById('aftermarket-flow-placeholder');
+             if (aftermarketPlaceholder) aftermarketPlaceholder.remove();
 
-            if (!currentUserData || !authReady) return;
 
-            const plan = DOMElements.adminPanel.classList.contains('hidden') ? (currentUserData.plan) : DOMElements.adminPlanSelector.value;
+             if (!currentUserData || !authReady) return;
+
+             const plan = DOMElements.adminPanel.classList.contains('hidden') ? (currentUserData.plan) : DOMElements.adminPlanSelector.value;
             
-            if (plan !== 'free') {
-                // Initial fetches
-                fetchAndRenderCrypto(true); // Pass true for initial load
-                fetchAndRenderNews();
-                fetchAndRenderFlow(null, true); // Pass true for initial load
+             if (plan !== 'free') {
+                 // Always fetch crypto and news
+                 fetchAndRenderCrypto(true); 
+                 fetchAndRenderNews();
+                 cryptoInterval = setInterval(() => fetchAndRenderCrypto(false), 300000); 
+                 newsInterval = setInterval(fetchAndRenderNews, 300000); 
 
-                // Set intervals
-                cryptoInterval = setInterval(() => fetchAndRenderCrypto(false), 300000); // 5 mins
-                newsInterval = setInterval(fetchAndRenderNews, 300000); // 5 mins
-                flowInterval = setInterval(() => fetchAndRenderFlow(null, false), 90000); // 90 seconds
-            } else {
+                 // --- Conditional Fetching based on Market Status ---
+                 // This will be called again by updateMarketCountdown, but good to set initial state
+                 const marketStatus = getMarketStatus();
+                 if (marketStatus.isOpen) {
+                     fetchAndRenderFlow(null, true); 
+                     flowInterval = setInterval(() => fetchAndRenderFlow(null, false), 90000); 
+                     DOMElements.aftermarketFlowView.classList.add('hidden'); 
+                 } else {
+                     if (currentFlowData.length > 0) {
+                         updateFlowTable(); 
+                     } else {
+                         fetchAndRenderFlow(null, true); // Try to get EOD data
+                     }
+                     fetchAndRenderAftermarketFlow(true); 
+                     aftermarketFlowInterval = setInterval(() => fetchAndRenderAftermarketFlow(false), 180000); 
+                     DOMElements.aftermarketFlowView.classList.remove('hidden'); 
+                 }
+                 
+             } else {
                  // Show upgrade messages for free plan
                  DOMElements.optionsTbody.innerHTML = '<tr id="flow-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Live options flow is a premium feature.<br>Please upgrade your plan.</td></tr>';
                  DOMElements.cryptoTbody.innerHTML = '<tr id="crypto-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Live crypto data is a premium feature.<br>Please upgrade your plan.</td></tr>';
                  DOMElements.heatmapContainer.innerHTML = '<p class="text-neutral-500 text-center">Heatmap is a premium feature.<br>Please upgrade your plan.</p>';
                  DOMElements.newsFeed.innerHTML = '<p class="text-center text-neutral-500 p-8 text-xs">Upgrade to access the live news feed.</p>';
-            }
-        }
+             }
+         }
 
         function stopDataFetching() { 
-            if (flowInterval) clearInterval(flowInterval); 
-            if (newsInterval) clearInterval(newsInterval); 
-            if (cryptoInterval) clearInterval(cryptoInterval); 
-        }
+             if (flowInterval) clearInterval(flowInterval); 
+             if (newsInterval) clearInterval(newsInterval); 
+             if (cryptoInterval) clearInterval(cryptoInterval); 
+             if (aftermarketFlowInterval) clearInterval(aftermarketFlowInterval); // Stop aftermarket interval too
+             flowInterval = null;
+             newsInterval = null;
+             cryptoInterval = null;
+             aftermarketFlowInterval = null;
+         }
 
+        // Fetch regular unusual options flow
         async function fetchAndRenderFlow(ticker = null, isInitialLoad = false) {
-             // Only pause automatic refreshes, allow manual ticker searches
              if (isPaused && !ticker) return; 
-             // Don't fetch if tab is hidden unless it's a specific ticker search
              if (document.hidden && !ticker) return; 
 
-             // Show loading indicator only on initial load if table is empty
              if (isInitialLoad && DOMElements.optionsTbody.children.length === 0) {
                  const placeholder = document.createElement('tr');
                  placeholder.id = 'flow-placeholder';
@@ -790,27 +880,57 @@
                  DOMElements.optionsTbody.appendChild(placeholder);
              }
              
-             const newData = await fetchOptionsFlowData(ticker);
+             const newData = await fetchOptionsFlowData(ticker); // Calls FMP_PROXY_URL
              const placeholder = document.getElementById('flow-placeholder');
-             if (placeholder) placeholder.remove(); // Always remove placeholder after fetch attempt
+             if (placeholder) placeholder.remove(); 
              
-             if (newData) { 
-                // Process and update table smoothly
-                processFlowUpdate(newData);
-                initialFlowLoadComplete = true; 
+             if (newData !== null) { // Check if fetch was successful (not null)
+                processFlowUpdate(newData); // Process newData (even if it's [])
+                if (!initialFlowLoadComplete && newData.length > 0) {
+                     initialFlowLoadComplete = true; // Mark as complete only if we got data
+                }
                 // Re-render heatmap if it's active and showing options
                 if (DOMElements.heatmapViewBtn.classList.contains('active') && activeHeatmapFilter === 'options') {
                     renderHeatmap();
                 }
-                checkAlerts(newData); // Check alerts against the full fetched data
+                // Only check alerts if newData is not empty
+                if(newData.length > 0) checkAlerts(newData); 
              } else {
-                 // Fetch failed - show error only if no data has ever been loaded
+                 // Fetch failed (returned null) - show error only if no data has ever been loaded
                  if (!initialFlowLoadComplete && DOMElements.optionsTbody.children.length === 0) { 
                       DOMElements.optionsTbody.innerHTML = `<tr id="flow-placeholder"><td colspan="6" class="text-center text-red-400 p-12">Failed to fetch options flow data. API may be down or unavailable.</td></tr>`;
                  }
-                 // If fetch failed but we have old data, the API banner already shows the error, keep old data.
+                 // If fetch failed but we have old data, the API banner shows the error, keep old data.
              }
          }
+
+        // NEW function to fetch AFTERMARKET trades
+        async function fetchAndRenderAftermarketFlow(isInitialLoad = false) {
+            if (isPaused || document.hidden) return;
+
+            if (isInitialLoad && DOMElements.aftermarketOptionsTbody.children.length === 0) {
+                 const placeholder = document.createElement('tr');
+                 placeholder.id = 'aftermarket-flow-placeholder';
+                 placeholder.innerHTML = `<td colspan="5" class="text-center text-neutral-500 p-6 text-xs">Fetching after-hours trades...</td>`;
+                 DOMElements.aftermarketOptionsTbody.appendChild(placeholder);
+            }
+
+            const newData = await fetchApi(FMP_AFTERMARKET_PROXY_URL); // Call the NEW endpoint
+            const placeholder = document.getElementById('aftermarket-flow-placeholder');
+             if (placeholder) placeholder.remove();
+
+            if (newData !== null) {
+                processAftermarketUpdate(newData); // Use a dedicated processing function
+                 if (!initialAftermarketLoadComplete && newData.length > 0) {
+                     initialAftermarketLoadComplete = true; 
+                 }
+            } else {
+                 if (!initialAftermarketLoadComplete && DOMElements.aftermarketOptionsTbody.children.length === 0) { 
+                      DOMElements.aftermarketOptionsTbody.innerHTML = `<tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-red-400 p-6 text-xs">Failed to fetch after-hours trades. API might require a premium key.</td></tr>`;
+                 }
+                 // Keep existing aftermarket data if fetch fails later
+            }
+        }
         
         async function fetchAndRenderNews() { 
             if (isPaused || document.hidden) return; 
@@ -819,7 +939,6 @@
                 currentNewsData = newsData; 
                 renderNewsFeed(); 
             } 
-            // Consider adding placeholder/error handling like in other fetches
         }
 
         async function fetchAndRenderCrypto(isInitialLoad = false) { 
@@ -849,124 +968,233 @@
             }
         }
 
-        // NEW function to handle smooth flow updates
-        function processFlowUpdate(newData) {
+        // processFlowUpdate - Handles UNUSUAL options flow (market hours)
+         function processFlowUpdate(newData) {
+             const marketStatus = getMarketStatus();
+             
+             // If we receive an empty array:
+             if (newData.length === 0) {
+                 if (initialFlowLoadComplete) {
+                     // Market is open: API returned empty (no activity). Keep showing existing data.
+                     // Market is closed: API returned empty (as expected). Keep showing existing data.
+                     console.log("Received empty options flow update, keeping existing data.");
+                     // If the table is currently empty (e.g., filters), show "No activity"
+                     if (DOMElements.optionsTbody.children.length === 0) {
+                         DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity found for your criteria.</td></tr>`;
+                     }
+                 } else {
+                     // Initial load failed (or was empty)
+                     DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity found. Flow data appears during market hours.</td></tr>`;
+                     currentFlowData = [];
+                     displayedFlowItems = new Set([...displayedFlowItems].filter(key => !key.startsWith('main-'))); // Clear main items
+                 }
+                 return; // Stop processing
+             }
+             
+             // If we have new data:
              const newTrades = [];
-             // Filter out trades we've already added, based on timestamp (or a better unique ID if available)
-             // Iterate in reverse to easily prepend in the correct order later
-             for (let i = newData.length - 1; i >= 0; i--) {
+             for (let i = newData.length - 1; i >= 0; i--) { // Iterate backwards to prepend correctly
                  const item = newData[i];
-                 // Create a more unique key if timestamp alone isn't sufficient
-                 const tradeKey = `${item.timestamp}-${item.symbol}-${item.strikePrice}-${item.putCall}-${item.totalValue}`; 
-                 if (!displayedFlowTimestamps.has(tradeKey)) {
+                 const tradeKey = `main-${item.timestamp}-${item.symbol}-${item.strikePrice}-${item.putCall}-${item.totalValue}`; // Prefix to distinguish
+                 if (!displayedFlowItems.has(tradeKey)) {
                      newTrades.push(item);
-                     displayedFlowTimestamps.add(tradeKey);
+                     displayedFlowItems.add(tradeKey);
                  }
              }
 
-             // If it's the very first load, just add all data without animation
-             if (!initialFlowLoadComplete && DOMElements.optionsTbody.children.length === 0) {
-                  currentFlowData = newData.sort((a,b) => b.timestamp - a.timestamp); // Sort newest first
-                  updateFlowTable(); // Initial full render
+             // If it's the very first load with data (or table is empty)
+             if (!initialFlowLoadComplete || DOMElements.optionsTbody.children.length === 0) {
+                  currentFlowData = newData.sort((a,b) => b.timestamp - a.timestamp); 
+                  updateFlowTable(); // Full re-render with filters/sort
+                  if (newData.length > 0) initialFlowLoadComplete = true;
                   return;
              }
              
+             // If we have new trades to add to the existing list
              if (newTrades.length > 0) {
-                // Prepend new rows with animation
+                 // We must filter/sort the new trades *before* prepending
+                 // Easiest way: add to main data, then call updateFlowTable
+                 currentFlowData.unshift(...newTrades);
+                 updateFlowTable(); // This will re-render the whole table, but respect filters/sort
+
+                 // This smooth-prepending logic is complex with filters/sort
+                 // Re-rendering (updateFlowTable) is safer
+                 /*
                  newTrades.forEach(item => {
                     const row = createFlowRowElement(item);
                     DOMElements.optionsTbody.prepend(row);
-                    // Add to our main data array as well
                     currentFlowData.unshift(item); 
                  });
-
-                 // Prune old rows if exceeding max count
-                 while (DOMElements.optionsTbody.children.length > MAX_FLOW_ROWS) {
-                     const oldestRowElement = DOMElements.optionsTbody.lastElementChild;
-                     if (oldestRowElement) {
-                         const oldestTimestamp = oldestRowElement.dataset.key; // Assuming we add data-key attribute
-                         if(oldestTimestamp) displayedFlowTimestamps.delete(oldestTimestamp);
-                         oldestRowElement.remove();
-                     } else {
-                        break; // Should not happen, but safety break
-                     }
+                 // Pruning logic...
+                 while (DOMElements.optionsTbody.children.length > MAX_FLOW_ROWS) { ... }
+                 currentFlowData.length = Math.min(currentFlowData.length, MAX_FLOW_ROWS + 50); 
+                 */
+             }
+         }
+         
+         // NEW function to handle smooth AFTERMARKET flow updates
+         function processAftermarketUpdate(newData) {
+              if (newData.length === 0) {
+                 if (initialAftermarketLoadComplete) {
+                     console.log("Received empty aftermarket update, keeping existing data.");
+                      if (DOMElements.aftermarketOptionsTbody.children.length === 0) {
+                         DOMElements.aftermarketOptionsTbody.innerHTML = `<tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">No recent after-hours trades found for monitored tickers.</td></tr>`;
+                      }
+                 } else {
+                    DOMElements.aftermarketOptionsTbody.innerHTML = `<tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">No recent after-hours trades found for monitored tickers.</td></tr>`;
+                    currentAftermarketData = [];
+                    displayedFlowItems = new Set([...displayedFlowItems].filter(key => !key.startsWith('ah-'))); // Clear AH items
                  }
-                 // Prune the main data array too
-                  currentFlowData.length = Math.min(currentFlowData.length, MAX_FLOW_ROWS * 1.2); // Keep a bit more in memory
+                 return;
+              }
 
 
-                 // Re-apply sorting/filtering to the *existing* DOM elements (more efficient than full re-render)
-                 // This part is complex. For simplicity now, we rely on prepending keeping the time sort mostly correct.
-                 // A full re-sort/filter might still be needed if those controls are changed.
-                 // updateFlowTable(); // Optionally call this to force re-sort/filter of the whole visible table
+             const newTrades = [];
+             for (let i = newData.length - 1; i >= 0; i--) { // Iterate backwards
+                 const item = newData[i];
+                 const tradeKey = `ah-${item.timestamp}-${item.symbol}-${item.tradePrice}-${item.tradeSize}`; 
+                 if (!displayedFlowItems.has(tradeKey)) {
+                     newTrades.push(item);
+                     displayedFlowItems.add(tradeKey);
+                 }
+             }
 
-             } else if (DOMElements.optionsTbody.children.length === 0) {
-                 // Handle case where fetch was successful but returned empty array
-                 DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity detected.</td></tr>`;
+             if (!initialAftermarketLoadComplete || DOMElements.aftermarketOptionsTbody.children.length === 0) {
+                  currentAftermarketData = newData.sort((a,b) => b.timestamp - a.timestamp); 
+                  renderAftermarketTable(); // Use a dedicated render function
+                  if (newData.length > 0) initialAftermarketLoadComplete = true;
+                  return;
+             }
+
+             if (newTrades.length > 0) {
+                 newTrades.forEach(item => {
+                    const row = createAftermarketRowElement(item);
+                    DOMElements.aftermarketOptionsTbody.prepend(row);
+                    currentAftermarketData.unshift(item); 
+                 });
+
+                 // Prune aftermarket table
+                 while (DOMElements.aftermarketOptionsTbody.children.length > MAX_AFTERMARKET_ROWS) {
+                     const oldestRowElement = DOMElements.aftermarketOptionsTbody.lastElementChild;
+                     if (oldestRowElement) {
+                         const oldestKey = oldestRowElement.dataset.key; 
+                         if(oldestKey) displayedFlowItems.delete(oldestKey);
+                         oldestRowElement.remove();
+                     } else { break; }
+                 }
+                 currentAftermarketData.length = Math.min(currentAftermarketData.length, MAX_AFTERMARKET_ROWS + 20);
              }
          }
 
-        // NEW helper to create a single flow row element
+
+        // createFlowRowElement - For UNUSUAL options flow
         function createFlowRowElement(item) {
             const row = document.createElement('tr');
-            const tradeKey = `${item.timestamp}-${item.symbol}-${item.strikePrice}-${item.putCall}-${item.totalValue}`;
-            row.dataset.key = tradeKey; // Store the unique key
+            const tradeKey = `main-${item.timestamp}-${item.symbol}-${item.strikePrice}-${item.putCall}-${item.totalValue}`; // Prefix key
+            row.dataset.key = tradeKey;
             row.dataset.ticker = item.symbol;
-            row.className = `cursor-pointer hover:bg-neutral-800/50 ${item.putCall === 'CALL' ? 'call-row' : 'put-row'} fade-in-down`; // Add animation class
+            row.className = `cursor-pointer hover:bg-neutral-800/50 ${item.putCall === 'CALL' ? 'call-row' : 'put-row'}`; // Remove fade-in-down here, apply in updateFlowTable if needed
             row.innerHTML = `
                 <td class="p-2 text-neutral-400">${new Date(item.timestamp * 1000).toLocaleTimeString()}</td>
                 <td class="p-2 font-semibold text-white">${item.symbol}</td>
                 <td class="p-2">
-                    <div class="font-semibold">${item.strikePrice.toFixed(2)} ${item.putCall}</div>
-                    <div class="text-neutral-400">${item.expiration}</div>
+                    <div class="font-semibold">${item.strikePrice ? item.strikePrice.toFixed(2) : 'N/A'} ${item.putCall || ''}</div>
+                    <div class="text-neutral-400">${item.expiration || ''}</div>
                 </td>
-                <td class="p-2 font-semibold ${item.sentiment === 'BULLISH' ? 'text-green-400' : 'text-red-400'}">${item.sentiment}</td>
+                <td class="p-2 font-semibold ${item.sentiment === 'BULLISH' ? 'text-green-400' : (item.sentiment === 'BEARISH' ? 'text-red-400' : 'text-neutral-400')}">${item.sentiment}</td>
                 <td class="p-2 text-right">
                     <div class="font-mono font-semibold ${getPremiumColor(item.totalValue)}">${formatCurrency(item.totalValue)}</div>
-                    <div class="text-neutral-400 text-xs">${item.tradeType.replace(/_/g, ' ')}</div>
+                    <div class="text-neutral-400 text-xs">${item.tradeType ? item.tradeType.replace(/_/g, ' ') : ''}</div>
                 </td>
                 <td class="p-2 text-right font-mono text-cyan-400" title="Vol: ${item.volume} / OI: ${item.openInterest}">
-                    <div>${item.volume} / ${item.openInterest}</div>
+                    <div>${item.volume || 'N/A'} / ${item.openInterest || 'N/A'}</div>
                 </td>
             `;
             return row;
         }
+        
+        // NEW helper to create a single AFTERMARKET flow row element
+        function createAftermarketRowElement(item) {
+             const row = document.createElement('tr');
+             const tradeKey = `ah-${item.timestamp}-${item.symbol}-${item.tradePrice}-${item.tradeSize}`; // Aftermarket key
+             row.dataset.key = tradeKey;
+             row.dataset.ticker = item.symbol; // Allow clicking ticker
+             row.className = `cursor-pointer hover:bg-neutral-800/50 text-xs`; // Smaller text
+             row.innerHTML = `
+                 <td class="p-1.5 text-neutral-400">${new Date(item.timestamp * 1000).toLocaleTimeString()}</td>
+                 <td class="p-1.5 font-semibold text-white">${item.symbol}</td>
+                 <td class="p-1.5 text-right font-mono">${item.tradePrice ? item.tradePrice.toFixed(2) : 'N/A'}</td>
+                 <td class="p-1.5 text-right font-mono">${item.tradeSize || 'N/A'}</td>
+                 <td class="p-1.5 text-right font-mono ${getPremiumColor(item.totalValue)}">${formatCurrency(item.totalValue)}</td>
+             `;
+             // Note: No Strike/Type/Sentiment/Vol/OI easily available in raw after-hours trades
+             return row;
+         }
 
-        // MODIFIED: This function now sorts/filters the *in-memory* data and performs a full re-render.
-        // Called on initial load and when filters/sort change. NOT called on every interval update.
+        // updateFlowTable - Renders the MAIN unusual flow table from currentFlowData
         function updateFlowTable() {
-             const filteredData = getFilteredAndSortedData(); // Gets data from currentFlowData array
+             const filteredData = getFilteredAndSortedData(); 
 
-             // Clear existing rows before full re-render
              DOMElements.optionsTbody.innerHTML = ''; 
-             displayedFlowTimestamps.clear(); // Clear tracking as we are rebuilding
+             
+             // Clear only main flow items from tracking set
+             displayedFlowItems = new Set([...displayedFlowItems].filter(key => !key.startsWith('main-')));
+
 
              if (filteredData.length === 0) {
-                 DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity found for your criteria.</td></tr>`; 
+                  // Only show this message if the initial load was complete OR market is open
+                  if(initialFlowLoadComplete || getMarketStatus().isOpen) {
+                     DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity found for your criteria.</td></tr>`; 
+                  } else if (!initialFlowLoadComplete) {
+                     // If initial load hasn't happened and market is closed, show initializing
+                      DOMElements.optionsTbody.innerHTML = `<tr id="flow-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Initializing flow... (Market Closed)</td></tr>`;
+                  }
                  return; 
              }
 
-             // Add rows back, without animation this time
-             filteredData.forEach(item => {
+             // Add fade-in only for the first row to simulate smooth update
+             filteredData.forEach((item, index) => {
                  const row = createFlowRowElement(item);
-                 row.classList.remove('fade-in-down'); // Remove animation for non-new rows
-                 const tradeKey = `${item.timestamp}-${item.symbol}-${item.strikePrice}-${item.putCall}-${item.totalValue}`;
-                 displayedFlowTimestamps.add(tradeKey); // Re-track displayed items
+                 if (index === 0) row.classList.add('fade-in-down'); // Add animation to top row
+                 const tradeKey = `main-${item.timestamp}-${item.symbol}-${item.strikePrice}-${item.putCall}-${item.totalValue}`;
+                 displayedFlowItems.add(tradeKey); 
                  DOMElements.optionsTbody.appendChild(row);
              });
          }
+         
+         // NEW function to render the AFTERMARKET table from currentAftermarketData
+         function renderAftermarketTable() {
+              const dataToRender = currentAftermarketData.sort((a,b) => b.timestamp - a.timestamp).slice(0, MAX_AFTERMARKET_ROWS);
+
+              DOMElements.aftermarketOptionsTbody.innerHTML = ''; // Clear previous
+              
+              // Clear only aftermarket tracked items
+              displayedFlowItems = new Set([...displayedFlowItems].filter(key => !key.startsWith('ah-')));
+
+
+              if (dataToRender.length === 0) {
+                   DOMElements.aftermarketOptionsTbody.innerHTML = `<tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">No recent after-hours trades found for monitored tickers.</td></tr>`;
+                   return;
+              }
+
+              dataToRender.forEach(item => {
+                  const row = createAftermarketRowElement(item);
+                  row.classList.remove('fade-in-down'); 
+                  const tradeKey = `ah-${item.timestamp}-${item.symbol}-${item.tradePrice}-${item.tradeSize}`;
+                  displayedFlowItems.add(tradeKey);
+                  DOMElements.aftermarketOptionsTbody.appendChild(row);
+              });
+         }
         
-        // renderNewsFeed remains mostly the same (innerHTML replacement is okay here)
         function renderNewsFeed() {
              if (!currentNewsData || currentNewsData.length === 0) { DOMElements.newsFeed.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">News feed unavailable.</p>`; return; }
              DOMElements.newsFeed.innerHTML = currentNewsData.map(news => `<a href="${news.url}" target="_blank" rel="noopener noreferrer" class="block p-2 rounded-md hover:bg-neutral-800/50 transition-colors"><p class="font-semibold text-neutral-200 text-xs">${news.title}</p><p class="text-xs text-neutral-500">${news.site} - ${timeAgo(news.publishedDate)}</p></a>`).join('');
         }
 
-       // renderCryptoFlowTable remains the same (innerHTML replacement is okay here)
        function renderCryptoFlowTable() {
             if (!currentCryptoData || currentCryptoData.length === 0) {
-                 DOMElements.cryptoTbody.innerHTML = `<tr id="crypto-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">No crypto data available.</td></tr>`;
-                 return;
+                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Could not fetch crypto data.</td></tr>`;
+                return;
             }
             DOMElements.cryptoTbody.innerHTML = currentCryptoData.map(crypto => {
                 const quote = crypto.quote.USD;
@@ -974,8 +1202,7 @@
                 const change24h = quote.percent_change_24h;
                 const color1h = change1h >= 0 ? 'text-green-400' : 'text-red-400';
                 const color24h = change24h >= 0 ? 'text-green-400' : 'text-red-400';
-                // Add fade-in for consistency, though it replaces all rows
-                return ` 
+                return `
                     <tr class="fade-in cursor-pointer hover:bg-neutral-800/50" data-ticker="${crypto.symbol}">
                         <td class="p-2">
                             <div class="font-semibold text-white">${crypto.name}</div>
@@ -990,115 +1217,174 @@
             }).join('');
         }
 
-        // getFilteredAndSortedData now operates purely on the in-memory currentFlowData
+        // getFilteredAndSortedData - Operates on currentFlowData (MAIN unusual flow)
         function getFilteredAndSortedData() {
-            let data = [...currentFlowData]; // Operate on a copy
+            let data = [...currentFlowData];
             if (activeFilter === 'watchlist') data = data.filter(item => userWatchlist.has(item.symbol));
             if (activeFilter === 'bullish') data = data.filter(item => item.sentiment === 'BULLISH');
             if (activeFilter === 'bearish') data = data.filter(item => item.sentiment === 'BEARISH');
             if (activePremiumFilter > 0) data = data.filter(item => item.totalValue >= activePremiumFilter);
-            
-            // Apply sorting to the filtered data
             data.sort((a, b) => {
                 if (activeSort === 'totalValue-desc') return b.totalValue - a.totalValue;
-                return b.timestamp - a.timestamp; // Default sort: newest first
+                return b.timestamp - a.timestamp; // Default sort is newest first
             });
-            // Return only up to MAX_FLOW_ROWS for rendering
             return data.slice(0, MAX_FLOW_ROWS); 
         }
 
-        // --- Sidebar & Data Persistence --- (No changes needed here)
-        function addWatchlistItem() { const ticker = DOMElements.watchlistInput.value.toUpperCase().trim(); if (ticker) { userWatchlist.add(ticker); DOMElements.watchlistInput.value = ''; updateUserData({ watchlist: Array.from(userWatchlist) }); renderWatchlist();} } // Re-render on add
-        function addAlertItem() { const ticker = DOMElements.alertTickerInput.value.toUpperCase().trim(); const premium = parseInt(DOMElements.alertPremiumSelect.value); if (ticker) { userAlerts.push({ ticker, premium }); DOMElements.alertTickerInput.value = ''; updateUserData({ alerts: userAlerts }); renderAlerts();} } // Re-render on add
-        function renderWatchlist() { DOMElements.watchlistContainer.innerHTML = [...userWatchlist].map(ticker => `<div class="flex items-center justify-between bg-neutral-800/50 p-2 rounded-md"><span class="font-semibold">${ticker}</span><button data-ticker="${ticker}" class="remove-watchlist-btn text-neutral-500 hover:text-red-400">&times;</button></div>`).join(''); document.querySelectorAll('.remove-watchlist-btn').forEach(btn => btn.addEventListener('click', (e) => { userWatchlist.delete(e.target.dataset.ticker); updateUserData({ watchlist: Array.from(userWatchlist) }); renderWatchlist();})); } // Re-render on remove
-        function renderAlerts() { DOMElements.alertsContainer.innerHTML = userAlerts.map((alert, index) => `<div class="flex items-center justify-between bg-neutral-800/50 p-2 rounded-md text-xs"><span>${alert.ticker} > ${formatCurrency(alert.premium)}</span><button data-index="${index}" class="remove-alert-btn text-neutral-500 hover:text-red-400">&times;</button></div>`).join(''); document.querySelectorAll('.remove-alert-btn').forEach(btn => btn.addEventListener('click', (e) => { userAlerts.splice(e.target.dataset.index, 1); updateUserData({ alerts: userAlerts }); renderAlerts();})); } // Re-render on remove
-        function checkAlerts(newData) { newData.forEach(trade => userAlerts.forEach(alert => { if (trade.symbol === alert.ticker && trade.totalValue >= alert.premium) { showAlertBanner(`${trade.symbol} alert: ${formatCurrency(trade.totalValue)} ${trade.sentiment} trade detected`); } })); }
+        // --- Sidebar & Data Persistence ---
+        function addWatchlistItem() { const ticker = DOMElements.watchlistInput.value.toUpperCase().trim(); if (ticker) { userWatchlist.add(ticker); DOMElements.watchlistInput.value = ''; updateUserData({ watchlist: Array.from(userWatchlist) }); } }
+        function addAlertItem() { const ticker = DOMElements.alertTickerInput.value.toUpperCase().trim(); const premium = parseInt(DOMElements.alertPremiumSelect.value); if (ticker) { userAlerts.push({ ticker, premium }); DOMElements.alertTickerInput.value = ''; updateUserData({ alerts: userAlerts }); } }
+        function renderWatchlist() { DOMElements.watchlistContainer.innerHTML = [...userWatchlist].map(ticker => `<div class="flex items-center justify-between bg-neutral-800/50 p-2 rounded-md"><span class="font-semibold">${ticker}</span><button data-ticker="${ticker}" class="remove-watchlist-btn text-neutral-500 hover:text-red-400">&times;</button></div>`).join(''); document.querySelectorAll('.remove-watchlist-btn').forEach(btn => btn.addEventListener('click', (e) => { userWatchlist.delete(e.target.dataset.ticker); updateUserData({ watchlist: Array.from(userWatchlist) }); })); }
+        function renderAlerts() { DOMElements.alertsContainer.innerHTML = userAlerts.map((alert, index) => `<div class="flex items-center justify-between bg-neutral-800/50 p-2 rounded-md text-xs"><span>${alert.ticker} > ${formatCurrency(alert.premium)}</span><button data-index="${index}" class="remove-alert-btn text-neutral-500 hover:text-red-400">&times;</button></div>`).join(''); document.querySelectorAll('.remove-alert-btn').forEach(btn => btn.addEventListener('click', (e) => { userAlerts.splice(e.target.dataset.index, 1); updateUserData({ alerts: userAlerts }); })); }
+        function checkAlerts(newData) { newData.forEach(trade => userAlerts.forEach(alert => { if (trade.symbol === alert.ticker && trade.totalValue >= alert.premium) { showAlertBanner(`${trade.symbol} alert: ${formatCurrency(trade.totalValue)} ${trade.sentiment} trade detected`); } })); } // Still checks main flow data
         
-        // --- API & Stripe --- (fetchApi slightly modified for clarity)
+        // --- API & Stripe ---
         async function fetchApi(url, options = {}) { 
             try { 
                 const r = await fetch(url, options); 
                 if (!r.ok) { 
-                    // Try to get error message from API response body
-                    let errorBodyText = await r.text(); // Get text first
-                    let errorJson = null;
-                    try { errorJson = JSON.parse(errorBodyText); } catch (e) { /* Ignore parsing error */ }
-
-                    let specificError = errorJson?.error || errorJson?.message || r.statusText;
-                    let friendlyMessage = `API ERROR: ${specificError} (${r.status}). Check console for details.`;
+                    const rClone = r.clone();
+                    let errorBody;
+                    try { 
+                        errorBody = await r.json(); 
+                    } catch (e) { 
+                        errorBody = await rClone.text(); 
+                    }
                     
+                    let friendlyMessage = `API ERROR: ${r.statusText}. Check console for details.`;
                     if (r.status === 404) {
-                        friendlyMessage = `API FUNCTION NOT FOUND (404). Ensure Netlify file/folder structure is correct: 'netlify/functions' and function name matches URL. URL: ${url}`;
-                    } else if (r.status === 401 || r.status === 403) {
-                         friendlyMessage = `API Authentication Error (${r.status}). Check your API keys in Netlify environment variables.`;
-                    } else if (r.status >= 500) {
-                        friendlyMessage = `Server Error (${r.status}) from API. Please try again later.`;
+                        friendlyMessage = `API FUNCTION NOT FOUND (404). Ensure file structure is netlify/functions/YOUR-FILE.js`;
+                    } else if (r.status === 500) {
+                        friendlyMessage = `API FUNCTION ERROR (500). Check function logs in Netlify. Is API key correct?`;
                     }
 
-                    console.error(`API Error: ${r.status} ${r.statusText}`, errorBodyText); // Log raw text
+                    console.error(`API Error: ${r.status} ${r.statusText} for ${url}`, errorBody);
                     DOMElements.apiStatusBanner.textContent = friendlyMessage;
                     DOMElements.apiStatusBanner.classList.remove('hidden'); 
-                    return null; // Return null on failure
+                    return null; 
                 } 
-                // Only hide banner on success
                 DOMElements.apiStatusBanner.classList.add('hidden'); 
                 return r.json(); 
             } catch (e) { 
-                console.error(`Fetch Network error:`, e);
-                DOMElements.apiStatusBanner.textContent = 'NETWORK ERROR. Could not connect to API. Check internet connection.';
+                console.error(`Fetch error for ${url}:`, e);
+                DOMElements.apiStatusBanner.textContent = 'NETWORK ERROR. Could not connect to API.';
                 DOMElements.apiStatusBanner.classList.remove('hidden'); 
-                return null; // Return null on failure
+                return null; 
             } 
         }
 
-        async function fetchOptionsFlowData(ticker = null) { let url = FMP_PROXY_URL; if (ticker) { url += `?symbol=${ticker}`; } return fetchApi(url); }
+        async function fetchOptionsFlowData(ticker = null) { 
+            let url = FMP_PROXY_URL; 
+            if (ticker) { url += `?symbol=${ticker}`; } 
+            return fetchApi(url); 
+        }
         async function fetchNewsData() { return fetchApi(NEWS_PROXY_URL); }
         async function fetchCryptoFlowData() { const url = `${CMC_PROXY_URL}?limit=${CRYPTO_LIMIT}`; const result = await fetchApi(url); return result ? Object.values(result.data) : null; }
-
-
+        
         function initiateStripeCheckout(priceId) {
             if (!stripe) { showAlertBanner("Stripe is not configured. Please add a valid publishable key."); return; }
             if (!priceId || priceId.includes('YOUR_')) { showAlertBanner("This plan's checkout is not configured yet."); return; }
             showAlertBanner(`Redirecting to Stripe for plan with Price ID: ${priceId}`);
-            // Actual Stripe redirect logic would go here
-            // stripe.redirectToCheckout({ lineItems: [{ price: priceId, quantity: 1 }], mode: 'subscription', ... });
         }
         
-        // --- Utilities --- (No changes needed)
+        // --- Utilities ---
         function getMarketStatus() { const now = new Date(); const nowET = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' })); const day = nowET.getDay(); const hour = nowET.getHours(); const minute = nowET.getMinutes(); const isWeekday = day >= 1 && day <= 5; const marketTime = hour * 60 + minute; const openTime = 9 * 60 + 30; const closeTime = 16 * 60; if (isWeekday && marketTime >= openTime && marketTime < closeTime) { return { isOpen: true, nextEvent: 'close', time: (closeTime - marketTime) * 60 }; } let nextOpenDayIndex = (day === 5 && marketTime >= closeTime) ? 1 : (day === 6 ? 1 : (day === 0 ? 1 : (marketTime < openTime ? day : day + 1))); if(nextOpenDayIndex > 5) nextOpenDayIndex = 1; let daysUntilOpen = (nextOpenDayIndex - day + 7) % 7; if (daysUntilOpen === 0 && marketTime >= closeTime) { daysUntilOpen = day === 5 ? 3 : 1; } let nextOpen = new Date(nowET); nextOpen.setDate(nowET.getDate() + daysUntilOpen); nextOpen.setHours(9, 30, 0, 0); return { isOpen: false, nextEvent: 'open', time: nextOpen.getTime() - nowET.getTime() }; }
-        function updateMarketCountdown() { const status = getMarketStatus(); if (status.isOpen) { const seconds = status.time; const minutes = Math.floor(seconds / 60); const hours = Math.floor(minutes / 60); const remainingMinutes = minutes % 60; DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div><span class="font-semibold text-green-400">Market Open</span><span class="text-neutral-400">| Closes in ${hours}h ${remainingMinutes}m</span></div>`; } else { DOMElements.marketStatusContainer.innerHTML = ''; } }
+        
+        // updateMarketCountdown - MODIFIED to handle interval switching and UI visibility
+        function updateMarketCountdown() {
+             const status = getMarketStatus();
+             if (status.isOpen) {
+                 // Market OPEN logic
+                 const seconds = status.time; 
+                 const minutes = Math.floor(seconds / 60); 
+                 const hours = Math.floor(minutes / 60); 
+                 const remainingMinutes = minutes % 60; 
+                 DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div><span class="font-semibold text-green-400">Market Open</span><span class="text-neutral-400">| Closes in ${hours}h ${remainingMinutes}m</span></div>`; 
+                 
+                 // If aftermarket interval is running, stop it and hide the section
+                 if (aftermarketFlowInterval) {
+                     console.log("Market opened, stopping aftermarket flow fetch.");
+                     clearInterval(aftermarketFlowInterval);
+                     aftermarketFlowInterval = null;
+                     DOMElements.aftermarketFlowView.classList.add('hidden');
+                 }
+                 // Start main flow interval if it's not running
+                 if (!flowInterval && currentUserData && currentUserData.plan !== 'free') {
+                     console.log("Market open, starting main flow fetch.");
+                     fetchAndRenderFlow(null, !initialFlowLoadComplete); // Fetch immediately if needed
+                     flowInterval = setInterval(() => fetchAndRenderFlow(null, false), 90000);
+                 }
+
+             } else {
+                 // Market CLOSED logic
+                  const ms = status.time; 
+                  const days = Math.floor(ms / (1000 * 60 * 60 * 24)); 
+                  const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)); 
+                  const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60)); 
+                  const seconds = Math.floor((ms % (1000 * 60)) / 1000); 
+                 DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-red-500 rounded-full"></div><span class="font-semibold text-red-400">Market Closed</span><span class="text-neutral-400">| Opens in ${days}d ${hours}h ${minutes}m ${seconds}s</span></div>`; 
+
+                 // If main flow interval is running, stop it
+                 if (flowInterval) {
+                     console.log("Market closed, stopping main flow fetch.");
+                     clearInterval(flowInterval);
+                     flowInterval = null;
+                      // Display persisted main flow data if available
+                     if(currentFlowData.length > 0) {
+                        updateFlowTable(); // Ensure correct filters/sort applied to persisted data
+                     } else if (!initialFlowLoadComplete){
+                         DOMElements.optionsTbody.innerHTML = `<tr id="flow-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Market Closed. Waiting for initial data...</td></tr>`;
+                     } else {
+                         DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Market Closed. No unusual activity found for your criteria.</td></tr>`; 
+                     }
+                 }
+                  // Start aftermarket interval if it's not running
+                 if (!aftermarketFlowInterval && currentUserData && currentUserData.plan !== 'free') {
+                     console.log("Market closed, starting aftermarket flow fetch.");
+                     DOMElements.aftermarketFlowView.classList.remove('hidden'); // Show the section
+                     fetchAndRenderAftermarketFlow(!initialAftermarketLoadComplete); // Fetch immediately
+                     aftermarketFlowInterval = setInterval(() => fetchAndRenderAftermarketFlow(false), 180000); // 3 mins
+                 }
+             } 
+         }
+
         const formatCurrency = (v) => v >= 1000000000 ? `$${(v/1000000000).toFixed(2)}b` : (v >= 1000000 ? `$${(v/1000000).toFixed(2)}m` : (v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v.toFixed(0)}`));
         const getPremiumColor = (p) => p > 250000 ? 'text-orange-400' : (p > 100000 ? 'text-yellow-400' : '');
         const timeAgo = (iso) => { if (!iso) return ''; const s = Math.floor((new Date() - new Date(iso)) / 1000); if (s < 0) return 'just now'; let i = s / 31536000; if (i > 1) return `${Math.floor(i)}y ago`; i = s / 2592000; if (i > 1) return `${Math.floor(i)}mo ago`; i = s / 86400; if (i > 1) return `${Math.floor(i)}d ago`; i = s / 3600; if (i > 1) return `${Math.floor(i)}h ago`; i = s / 60; if (i > 1) return `${Math.floor(i)}m ago`; return `${Math.floor(s)}s ago`; };
         const getFriendlyAuthError = (err) => { switch (err.code) { case 'auth/user-not-found': case 'auth/wrong-password': return 'Invalid email or password.'; case 'auth/email-already-in-use': return 'An account with this email already exists.'; case 'auth/popup-closed-by-user': return 'Sign-in window closed. Please try again.'; case 'auth/internal-error': return 'An internal authentication error occurred. Please try again later.' ; default: console.error("Authentication Error:", err); return 'An unexpected error occurred. Please try again.'; } };
-        const togglePause = () => { isPaused = !isPaused; DOMElements.pausePlayBtn.innerHTML = isPaused ? '<i data-lucide="play-circle" class="w-4 h-4"></i><span>Resume</span>' : '<i data-lucide="pause-circle" class="w-4 h-4"></i><span>Pause</span>'; lucide.createIcons(); if(!isPaused){/* Optionally trigger immediate fetch on resume */} };
-        const handleFilterClick = (e) => { const btn = e.target.closest('.control-button'); if(btn){ document.querySelectorAll('.control-button').forEach(b => b.classList.remove('active')); btn.classList.add('active'); activeFilter = btn.id.replace('filter-', ''); updateFlowTable(); }}; // Use updateFlowTable here
+        const togglePause = () => { isPaused = !isPaused; DOMElements.pausePlayBtn.innerHTML = isPaused ? '<i data-lucide="play-circle" class="w-4 h-4"></i><span>Resume</span>' : '<i data-lucide="pause-circle" class="w-4 h-4"></i><span>Pause</span>'; lucide.createIcons(); };
         const showAlertBanner = (msg) => { const banner = document.createElement('div'); banner.className = 'alert-banner bg-orange-500 text-white font-bold p-3 rounded-lg shadow-lg mb-2 flex items-center justify-between'; banner.innerHTML = `<span>${msg}</span><button class="ml-4 text-white/80 hover:text-white">&times;</button>`; DOMElements.alertBannerContainer.prepend(banner); banner.querySelector('button').addEventListener('click', () => banner.remove()); setTimeout(() => banner.remove(), 5000); };
         const showModal = (type) => { const content = { tos: { title: "Terms of Service", body: `<h4>1. Acceptance of Terms</h4><p>By accessing or using AlphaFlow, you agree to be bound by these Terms of Service...</p><h4>2. Financial Disclaimer</h4><p>AlphaFlow is a data provider and educational tool... You are solely responsible for your own investment decisions...</p>` }, privacy: { title: "Privacy Policy", body: `<h4>1. Information We Collect</h4><p>We collect information to provide and improve our Service...</p><h4>2. Use of Data</h4><p>AlphaFlow uses the collected data for various purposes...</p>`}, contact: { title: "Customer Service", body: `<h4>Contact Information</h4><p>For support, billing questions, or any other inquiries, please email our support team at: <a href="mailto:support@alphaflow.io" class="text-orange-400">support@alphaflow.io</a>.</p>` } }; DOMElements.modalTitle.textContent = content[type].title; DOMElements.modalBody.innerHTML = content[type].body.replace(/\.\.\./g, ' and other standard clauses.'); DOMElements.genericModal.classList.remove('hidden'); };
 
         // --- App Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
             DOMElements = Object.fromEntries(Array.from(document.querySelectorAll('[id]')).map(el => [el.id.replace(/-(\w)/g, (m, g) => g.toUpperCase()), el]));
+            // Add new DOM elements for aftermarket view
+            DOMElements.aftermarketFlowView = document.getElementById('aftermarket-flow-view');
+            DOMElements.aftermarketOptionsTbody = document.getElementById('aftermarket-options-tbody');
+
             DOMElements.pages = { dashboard: DOMElements.dashboardPage, plans: DOMElements.plansPage, account: DOMElements.accountPage, backtester: DOMElements.backtesterPage, chart: DOMElements.chartPage };
 
             try {
-                // --- Initialize Firebase ---
+                // Initialize Firebase
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
+                setLogLevel('debug'); // Enable Firestore debug logging
 
-                // --- Safely initialize Stripe ---
+                // Safely initialize Stripe
                 if (STRIPE_PUBLISHABLE_KEY && STRIPE_PUBLISHABLE_KEY !== 'YOUR_STRIPE_PUBLISHABLE_KEY') {
                     stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
                 } else {
                     console.warn("Stripe key is a placeholder. Payment functionality will be disabled.");
                 }
                 
-                // --- Setup Listeners ---
+                // Setup Listeners
                 setupAuthListeners(); 
                 setupEventListeners(); 
                 lucide.createIcons(); 
                 
+                // Auth State Change Listener
                 onAuthStateChanged(auth, user => { 
                     authReady = true; 
                     currentUser = user; 
@@ -1117,4 +1403,3 @@
     </script>
 </body>
 </html>
-
