@@ -1,4 +1,5 @@
 // This is your secure, serverless function for the FMP API.
+const fetch = require('node-fetch'); // <-- ADDED THIS LINE
 
 exports.handler = async function(event, context) {
     // 1. Securely access the FMP API key from Netlify's environment variables.
@@ -41,3 +42,5 @@ exports.handler = async function(event, context) {
         };
     }
 };
+
+
