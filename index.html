@@ -251,13 +251,13 @@
         };
         const STRIPE_PUBLISHABLE_KEY = 'YOUR_STRIPE_PUBLISHABLE_KEY'; // REPLACE THIS
         const ADMIN_EMAIL = "travisclevenger.tc@gmail.com";
-        const CRYPTO_LIMIT = 100; // <-- UPDATED: Fetch Top 100 cryptos
+        const CRYPTO_LIMIT = 100; // Fetch Top 100 Cryptos
 
         // Secure Netlify Function Endpoints
+        // These URLs MUST match your file structure: netlify/functions/FUNCTION-NAME
         const CMC_PROXY_URL = '/.netlify/functions/crypto';
         const FMP_PROXY_URL = '/.netlify/functions/options-flow';
         const NEWS_PROXY_URL = '/.netlify/functions/news';
-        const SEARCH_PROXY_URL = '/.netlify/functions/search'; // <-- NEW: Smart Search endpoint
 
         // --- App State ---
         let app, auth, db;
@@ -417,32 +417,12 @@
             DOMElements.sortSelect.addEventListener('change', e => { activeSort = e.target.value; renderFlowTable(); });
             DOMElements.premiumSelect.addEventListener('change', e => { activePremiumFilter = parseInt(e.target.value); renderFlowTable(); });
             
-            // --- UPDATED: Smart Search Logic ---
-            DOMElements.searchInput.addEventListener('keydown', async (e) => {
+            DOMElements.searchInput.addEventListener('keydown', e => {
                 if (e.key === 'Enter') {
-                    e.preventDefault();
                     const searchTerm = e.target.value.toUpperCase().trim();
-                    if (!searchTerm) return;
-                    
-                    // Show loading state in the chart popup
-                    DOMElements.pages.chart.classList.remove('hidden');
-                    DOMElements.chartTickerTitle.textContent = `Searching for ${searchTerm}...`;
-                    DOMElements.tradingviewWidgetContainer.innerHTML = '<div class="text-neutral-500 text-center p-8">Loading...</div>';
-
-                    // Call the new smart search function
-                    const searchResult = await fetchApi(`${SEARCH_PROXY_URL}?symbol=${searchTerm}`);
-                    
-                    let chartSymbol;
-                    if (searchResult && searchResult.isCrypto) {
-                        // It's crypto, format for TradingView
-                        chartSymbol = `COINBASE:${searchTerm}USD`; 
-                    } else {
-                        // It's a stock (or not found in CMC, so assume stock)
-                        chartSymbol = searchTerm;
-                    }
-                    
-                    // Call showChartView with BOTH the clean ticker AND the formatted symbol
-                    showChartView(searchTerm, chartSymbol);
+                    e.preventDefault();
+                    if(!searchTerm) return;
+                    showChartView(searchTerm); // Reverted to original, simple logic
                 }
             });
 
@@ -455,17 +435,8 @@
             DOMElements.accountChangePlanBtn.addEventListener('click', () => setActivePage('plans'));
             DOMElements.sidebarUpgradeBtn.addEventListener('click', () => setActivePage('plans'));
             DOMElements.backtesterUpgradeBtn.addEventListener('click', () => setActivePage('plans'));
-            
-            // --- UPDATED: Click handlers to pass correct chart symbol ---
-            DOMElements.optionsTbody.addEventListener('click', e => { 
-                const tickerCell = e.target.closest('tr')?.dataset.ticker; 
-                if (tickerCell) showChartView(tickerCell, tickerCell); // Stock symbol is the same
-            });
-            DOMElements.cryptoTbody.addEventListener('click', e => { 
-                const tickerCell = e.target.closest('tr')?.dataset.ticker; 
-                if (tickerCell) showChartView(tickerCell, `COINBASE:${tickerCell}USD`); // Crypto symbol needs formatting
-            });
-
+            DOMElements.optionsTbody.addEventListener('click', e => { const tickerCell = e.target.closest('tr')?.dataset.ticker; if (tickerCell) showChartView(tickerCell); });
+            DOMElements.cryptoTbody.addEventListener('click', e => { const tickerCell = e.target.closest('tr')?.dataset.ticker; if (tickerCell) showChartView(tickerCell); });
             DOMElements.backToDashboardChart.addEventListener('click', () => DOMElements.pages.chart.classList.add('hidden'));
             document.querySelectorAll('.plan-button').forEach(button => button.addEventListener('click', () => initiateStripeCheckout(button.dataset.priceId)));
             DOMElements.adminPlanSelector.addEventListener('change', () => { updateUIForPlan(); renderHeader(); });
@@ -507,37 +478,22 @@
             startDataFetching();
         }
 
-        // --- UPDATED: Simplified showChartView function ---
-        function showChartView(ticker, chartSymbol) {
+        function showChartView(ticker) {
             const plan = DOMElements.adminPanel.classList.contains('hidden') ? currentUserData.plan : DOMElements.adminPlanSelector.value;
-            if (plan === 'free') { 
-                showAlertBanner("Charting is a premium feature. Please upgrade."); 
-                DOMElements.pages.chart.classList.add('hidden'); // Hide chart page if they are free
-                return; 
-            }
+            if (plan === 'free') { showAlertBanner("Charting is a premium feature. Please upgrade."); return; }
             
-            // chartSymbol is now passed directly (e.g., "TSLA" or "COINBASE:BTCUSD")
-            // ticker is the clean name for the title (e.g., "TSLA" or "BTC")
+            let chartSymbol = ticker;
+            // Check if the ticker is a known crypto symbol from our Top 100 list
+            // This is the original logic that correctly identifies SPY as a stock.
+            const isCrypto = currentCryptoData.some(c => c.symbol === ticker);
+            if (isCrypto) {
+                chartSymbol = `COINBASE:${ticker}USD`;
+            }
 
             DOMElements.pages.chart.classList.remove('hidden');
-            DOMElements.chartTickerTitle.textContent = ticker; // Use the clean ticker for the title
-            DOMElements.tradingviewWidgetContainer.innerHTML = ''; // Clear any previous chart or loading text
-            
-            new TradingView.widget({ 
-                "width": "100%", 
-                "height": "100%", 
-                "symbol": chartSymbol, // Use the pre-formatted symbol
-                "interval": "D", 
-                "timezone": "Etc/UTC", 
-                "theme": "dark", 
-                "style": "1", 
-                "locale": "en", 
-                "enable_publishing": false, 
-                "withdateranges": true, 
-                "hide_side_toolbar": false, 
-                "allow_symbol_change": true, 
-                "container_id": "tradingview-widget-container" 
-            });
+            DOMElements.chartTickerTitle.textContent = ticker;
+            DOMElements.tradingviewWidgetContainer.innerHTML = '';
+            new TradingView.widget({ "width": "100%", "height": "100%", "symbol": chartSymbol, "interval": "D", "timezone": "Etc/UTC", "theme": "dark", "style": "1", "locale": "en", "enable_publishing": false, "withdateranges": true, "hide_side_toolbar": false, "allow_symbol_change": true, "container_id": "tradingview-widget-container" });
         }
         
         function switchView(view) {
@@ -576,8 +532,7 @@
             const root = pack(d3.hierarchy({ children: aggregatedData }).sum(d => d.totalPremium));
             
             const svg = container.append("svg").attr("width", width).attr("height", height).attr("font-size", 10).attr("text-anchor", "middle");
-            const g = svg.selectAll("g").data(root.leaves()).enter().append("g").attr("class", "heatmap-bubble").attr("transform", d => `translate(${d.x},${d.y})`)
-                .on("click", (event, d) => showChartView(d.data.symbol, d.data.symbol)); // <-- UPDATED: Pass stock symbol
+            const g = svg.selectAll("g").data(root.leaves()).enter().append("g").attr("class", "heatmap-bubble").attr("transform", d => `translate(${d.x},${d.y})`).on("click", (event, d) => showChartView(d.data.symbol));
 
             g.append("circle")
                 .attr("r", d => d.r)
@@ -612,54 +567,71 @@
             if (plan !== 'free') {
                 fetchAndRenderCrypto();
                 fetchAndRenderNews();
-                cryptoInterval = setInterval(fetchAndRenderCrypto, 300000);
-                newsInterval = setInterval(fetchAndRenderNews, 300000);
+                fetchAndRenderFlow(); // Always fetch flow on load, 24/7
+                cryptoInterval = setInterval(fetchAndRenderCrypto, 300000); // 5 mins
+                newsInterval = setInterval(fetchAndRenderNews, 300000); // 5 mins
+                flowInterval = setInterval(fetchAndRenderFlow, 90000); // 90 seconds
             } else {
                  DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Live crypto data is a premium feature.<br>Please upgrade your plan.</td></tr>`;
                  DOMElements.newsFeed.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">Upgrade to access the live news feed.</p>`;
-            }
-
-            if (plan !== 'free' && getMarketStatus().isOpen) {
-                fetchAndRenderFlow();
-                flowInterval = setInterval(fetchAndRenderFlow, 90000); 
-            } else {
-                 DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Market is currently closed. Live options flow will resume on open.</td></tr>`;
-                 if (plan === 'free') {
-                    DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Live options flow is a premium feature.<br>Please upgrade your plan.</td></tr>`;
-                 }
+                 DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Live options flow is a premium feature.<br>Please upgrade your plan.</td></tr>`;
             }
         }
 
         function stopDataFetching() { if (flowInterval) clearInterval(flowInterval); if (newsInterval) clearInterval(newsInterval); if (cryptoInterval) clearInterval(cryptoInterval); }
 
         async function fetchAndRenderFlow(ticker = null) {
-            if (isPaused || document.hidden) return;
-            const marketStatus = getMarketStatus();
-            if (!marketStatus.isOpen && !ticker) return;
+            if (isPaused || (document.hidden && !ticker)) return; // Still allow ticker search even if tab is hidden
 
-            DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest flow data...</td></tr>`;
+            // Show loading placeholder only if the table is currently empty
+            if (DOMElements.optionsTbody.innerHTML === '') {
+                DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest flow data...</td></tr>`;
+            }
+            
             const newData = await fetchOptionsFlowData(ticker);
-            if (newData) { currentFlowData = newData; renderFlowTable(); if (DOMElements.heatmapViewBtn.classList.contains('active')) renderHeatmap(); checkAlerts(newData); }
+            
+            if (newData) { 
+                currentFlowData = newData; 
+                renderFlowTable(); 
+                if (DOMElements.heatmapViewBtn.classList.contains('active')) renderHeatmap(); 
+                checkAlerts(newData); 
+            } else if (currentFlowData.length === 0) { // Handle error only if no data is present
+                DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-red-400 p-12">Failed to fetch options flow data. API may be down.</td></tr>`;
+            }
         }
         
-        async function fetchAndRenderNews() { if (isPaused || document.hidden) return; const newsData = await fetchNewsData(); if(newsData) { currentNewsData = newsData; renderNewsFeed(); } }
+        async function fetchAndRenderNews() { 
+            if (isPaused || document.hidden) return; 
+            const newsData = await fetchNewsData(); 
+            if(newsData) { 
+                currentNewsData = newsData; 
+                renderNewsFeed(); 
+            } 
+        }
+
         async function fetchAndRenderCrypto() { 
             if (isPaused || document.hidden) return;
-            DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest crypto data...</td></tr>`;
+            
+            if (DOMElements.cryptoTbody.innerHTML === '') {
+                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest crypto data...</td></tr>`;
+            }
+            
             const data = await fetchCryptoFlowData(); 
             if(data) {
                 currentCryptoData = data;
                 renderCryptoFlowTable();
-            } else {
-                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Could not fetch crypto data.</td></tr>`;
+            } else if (currentCryptoData.length === 0) {
+                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-red-400 p-12">Could not fetch crypto data. API may be down.</td></tr>`;
             }
         }
 
         function renderFlowTable() {
             const filteredData = getFilteredAndSortedData();
-            if (filteredData.length === 0 && getMarketStatus().isOpen) { DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity found for your criteria.</td></tr>`; return; }
-            if (filteredData.length === 0 && !getMarketStatus().isOpen) { DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Market is currently closed. Live options flow will resume on open.</td></tr>`; return;}
-            if (filteredData.length === 0) return;
+            if (filteredData.length === 0) {
+                // Removed "Market Closed" message
+                DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity found for your criteria.</td></tr>`; 
+                return; 
+            }
 
             DOMElements.optionsTbody.innerHTML = filteredData.map(item => `
                 <tr class="fade-in cursor-pointer hover:bg-neutral-800/50 ${item.putCall === 'CALL' ? 'call-row' : 'put-row'}" data-ticker="${item.symbol}">
@@ -746,7 +718,7 @@
                     
                     let friendlyMessage = `API ERROR: ${r.statusText}. Check console for details.`;
                     if (r.status === 404) {
-                        friendlyMessage = `API FUNCTION NOT FOUND (404). Ensure netlify.toml is correct and function files are in the root.`;
+                        friendlyMessage = `API FUNCTION NOT FOUND (404). Ensure Netlify file/folder structure is correct: 'netlify/functions'`;
                     }
 
                     console.error(`API Error: ${r.status} ${r.statusText}`, errorBody);
@@ -766,13 +738,8 @@
 
         async function fetchOptionsFlowData(ticker = null) { let url = FMP_PROXY_URL; if (ticker) { url += `?symbol=${ticker}`; } return fetchApi(url); }
         async function fetchNewsData() { return fetchApi(NEWS_PROXY_URL); }
-        
-        // --- UPDATED: Fetch Top 100 Cryptos ---
-        async function fetchCryptoFlowData() { 
-            const url = `${CMC_PROXY_URL}?limit=${CRYPTO_LIMIT}`; // Use limit instead of ID
-            const result = await fetchApi(url); 
-            return result ? Object.values(result.data) : null; 
-        }
+        async function fetchCryptoFlowData() { const url = `${CMC_PROXY_URL}?limit=${CRYPTO_LIMIT}`; const result = await fetchApi(url); return result ? Object.values(result.data) : null; }
+
 
         function initiateStripeCheckout(priceId) {
             if (!stripe) { showAlertBanner("Stripe is not configured. Please add a valid publishable key."); return; }
@@ -782,7 +749,22 @@
         
         // --- Utilities ---
         function getMarketStatus() { const now = new Date(); const nowET = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' })); const day = nowET.getDay(); const hour = nowET.getHours(); const minute = nowET.getMinutes(); const isWeekday = day >= 1 && day <= 5; const marketTime = hour * 60 + minute; const openTime = 9 * 60 + 30; const closeTime = 16 * 60; if (isWeekday && marketTime >= openTime && marketTime < closeTime) { return { isOpen: true, nextEvent: 'close', time: (closeTime - marketTime) * 60 }; } let nextOpenDayIndex = (day === 5 && marketTime >= closeTime) ? 1 : (day === 6 ? 1 : (day === 0 ? 1 : (marketTime < openTime ? day : day + 1))); if(nextOpenDayIndex > 5) nextOpenDayIndex = 1; let daysUntilOpen = (nextOpenDayIndex - day + 7) % 7; if (daysUntilOpen === 0 && marketTime >= closeTime) { daysUntilOpen = day === 5 ? 3 : 1; } let nextOpen = new Date(nowET); nextOpen.setDate(nowET.getDate() + daysUntilOpen); nextOpen.setHours(9, 30, 0, 0); return { isOpen: false, nextEvent: 'open', time: nextOpen.getTime() - nowET.getTime() }; }
-        function updateMarketCountdown() { const status = getMarketStatus(); if (status.isOpen) { const seconds = status.time; const minutes = Math.floor(seconds / 60); const hours = Math.floor(minutes / 60); const remainingMinutes = minutes % 60; DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div><span class="font-semibold text-green-400">Market Open</span><span class="text-neutral-400">| Closes in ${hours}h ${remainingMinutes}m</span></div>`; if(DOMElements.optionsTbody.innerHTML.includes('Market is currently closed')) DOMElements.optionsTbody.innerHTML = '<tr><td colspan="6" class="text-center text-neutral-500 p-12">Awaiting options flow data...</td></tr>'; } else { const ms = status.time; const days = Math.floor(ms / (1000 * 60 * 60 * 24)); const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)); const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60)); const seconds = Math.floor((ms % (1000 * 60)) / 1000); DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-red-500 rounded-full"></div><span class="font-semibold text-red-400">Market Closed</span><span class="text-neutral-400">| Opens in ${days}d ${hours}h ${minutes}m ${seconds}s</span></div>`; DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Market is currently closed. Live options flow will resume on open.</td></tr>`; } }
+        
+        // Removed "Market Closed" logic, but left market status for "Market Open" badge
+        function updateMarketCountdown() { 
+            const status = getMarketStatus(); 
+            if (status.isOpen) { 
+                const seconds = status.time; 
+                const minutes = Math.floor(seconds / 60); 
+                const hours = Math.floor(minutes / 60); 
+                const remainingMinutes = minutes % 60; 
+                DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div><span class="font-semibold text-green-400">Market Open</span><span class="text-neutral-400">| Closes in ${hours}h ${remainingMinutes}m</span></div>`; 
+            } else { 
+                // Clear the container when market is closed, as requested
+                DOMElements.marketStatusContainer.innerHTML = ''; 
+            } 
+        }
+
         const formatCurrency = (v) => v >= 1000000000 ? `$${(v/1000000000).toFixed(2)}b` : (v >= 1000000 ? `$${(v/1000000).toFixed(2)}m` : (v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v.toFixed(0)}`));
         const getPremiumColor = (p) => p > 250000 ? 'text-orange-400' : (p > 100000 ? 'text-yellow-400' : '');
         const timeAgo = (iso) => { if (!iso) return ''; const s = Math.floor((new Date() - new Date(iso)) / 1000); if (s < 0) return 'just now'; let i = s / 31536000; if (i > 1) return `${Math.floor(i)}y ago`; i = s / 2592000; if (i > 1) return `${Math.floor(i)}mo ago`; i = s / 86400; if (i > 1) return `${Math.floor(i)}d ago`; i = s / 3600; if (i > 1) return `${Math.floor(i)}h ago`; i = s / 60; if (i > 1) return `${Math.floor(i)}m ago`; return `${Math.floor(s)}s ago`; };
@@ -833,5 +815,4 @@
     </script>
 </body>
 </html>
-
 
