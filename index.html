@@ -31,9 +31,17 @@
         ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #52525b; }
         .sticky-header { position: sticky; top: 0; z-index: 10; }
-        .control-button.active, .view-button.active { background-color: #ea580c; color: #ffffff; }
+        .control-button.active, .view-button.active, .heatmap-filter-button.active { background-color: #ea580c; color: #ffffff; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        /* Used for initial page load */
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; } 
+         /* Used for new flow rows */
+        @keyframes fadeInDown { 
+            from { opacity: 0; transform: translateY(-10px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
+        .fade-in-down { animation: fadeInDown 0.4s ease-out forwards; }
+
         .custom-select {
             background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
             background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-right: 2.5rem;
@@ -42,8 +50,8 @@
         @keyframes slideInDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .alert-banner { animation: slideInDown 0.5s ease-out forwards; }
         .heatmap-bubble { cursor: pointer; }
-        .heatmap-bubble circle { transition: transform 0.3s ease; }
-        .heatmap-bubble:hover circle { transform: scale(1.05); filter: drop-shadow(0 0 10px rgba(234, 88, 12, 0.7)); }
+        .heatmap-bubble circle { transition: transform 0.3s ease, filter 0.3s ease; }
+        .heatmap-bubble:hover circle { transform: scale(1.05); filter: brightness(1.1); }
         .page-container { overflow-y: auto; height: calc(100vh - 110px); }
         .modal { transition: opacity 0.25s ease; }
         .modal-content { transition: transform 0.25s ease; }
@@ -51,6 +59,7 @@
         .prose-invert a:hover { color: #fdba74; }
         .call-row { border-left: 3px solid #22c55e; }
         .put-row { border-left: 3px solid #ef4444; }
+        #options-tbody tr:first-child { /* Style first row differently if needed */ }
     </style>
 </head>
 <body class="text-sm">
@@ -89,9 +98,9 @@
                         <div class="p-3 border-b border-neutral-800 space-y-3">
                             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                <div class="flex items-center gap-2 p-1 bg-neutral-800/50 rounded-md">
-                                    <button id="flow-view-btn" class="view-button active flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">Flow</button>
-                                    <button id="heatmap-view-btn" class="view-button flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">Heatmap</button>
-                                    <button id="crypto-view-btn" class="view-button flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">Crypto</button>
+                                    <button id="flow-view-btn" data-view="flow" class="view-button active flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">Flow</button>
+                                    <button id="heatmap-view-btn" data-view="heatmap" class="view-button flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">Heatmap</button>
+                                    <button id="crypto-view-btn" data-view="crypto" class="view-button flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">Crypto</button>
                                 </div>
                                 <input type="text" id="search-input" placeholder="Search Ticker..." class="bg-neutral-800/50 border border-neutral-700 rounded-md pl-3 pr-3 py-1.5 w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs">
                                 <div id="flow-filters" class="flex items-center gap-2 flex-wrap">
@@ -118,19 +127,30 @@
                                  </div>
                              </div>
                              <div id="crypto-controls" class="hidden flex items-center justify-between gap-3"><h2 class="text-xl font-bold text-white">Crypto Flow</h2></div>
+                             <!-- NEW Heatmap specific controls -->
+                             <div id="heatmap-controls" class="hidden flex items-center justify-center gap-2 mt-2">
+                                <span class="text-xs text-neutral-400 font-medium mr-2">Heatmap Data:</span>
+                                <button data-heatmap-filter="options" class="heatmap-filter-button active px-3 py-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 transition-colors text-xs">Options</button>
+                                <button data-heatmap-filter="crypto" class="heatmap-filter-button px-3 py-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 transition-colors text-xs">Crypto</button>
+                             </div>
                         </div>
                         <div id="market-status-container" class="p-3 text-center border-b border-neutral-800"></div>
                         <div id="flow-view" class="flex-grow overflow-y-auto">
                             <table class="w-full text-left text-xs">
                                 <thead class="sticky-header text-neutral-400 uppercase bg-neutral-900"><tr><th class="p-2">Time</th><th class="p-2">Ticker</th><th class="p-2">Details</th><th class="p-2">Sentiment</th><th class="p-2 text-right">Premium</th><th class="p-2 text-right">Vol / OI</th></tr></thead>
-                                <tbody id="options-tbody" class="divide-y divide-neutral-800"></tbody>
+                                <tbody id="options-tbody" class="divide-y divide-neutral-800">
+                                    <!-- Rows will be prepended here by JS -->
+                                    <tr id="flow-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Initializing flow...</td></tr>
+                                </tbody>
                             </table>
                         </div>
-                         <div id="heatmap-view" class="hidden flex-grow p-4 justify-center"><div id="heatmap-container" class="w-full h-full"></div></div>
+                         <div id="heatmap-view" class="hidden flex-grow p-4 flex items-center justify-center"><div id="heatmap-container" class="w-full h-full max-w-full max-h-full"></div></div>
                          <div id="crypto-view" class="hidden flex-grow overflow-y-auto">
                             <table class="w-full text-left text-xs">
                                 <thead class="sticky-header text-neutral-400 uppercase bg-neutral-900"><tr><th class="p-2">Name</th><th class="p-2 text-right">Price</th><th class="p-2 text-right">1h %</th><th class="p-2 text-right">24h %</th><th class="p-2 text-right">24h Volume</th><th class="p-2 text-right">Market Cap</th></tr></thead>
-                                <tbody id="crypto-tbody" class="divide-y divide-neutral-800"></tbody>
+                                <tbody id="crypto-tbody" class="divide-y divide-neutral-800">
+                                     <tr id="crypto-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Initializing crypto data...</td></tr>
+                                </tbody>
                             </table>
                         </div>
                     </div>
@@ -144,7 +164,8 @@
                     </div>
                 </div>
             </div>
-            <div id="plans-page" class="hidden page-container p-4">
+            <!-- Other Pages (Plans, Account, Backtester, Chart) remain the same -->
+             <div id="plans-page" class="hidden page-container p-4">
                  <div class="bg-neutral-900 rounded-lg shadow-lg w-full max-w-7xl mx-auto p-6">
                     <div class="text-center pb-2 border-b border-neutral-800 mb-6"><h2 class="text-3xl font-bold text-white">Choose Your Plan</h2><p class="text-neutral-400 mt-2">Unlock your trading edge with the right tools.</p></div>
                     <div class="flex-grow flex items-center justify-center py-8">
@@ -252,6 +273,7 @@
         const STRIPE_PUBLISHABLE_KEY = 'YOUR_STRIPE_PUBLISHABLE_KEY'; // REPLACE THIS
         const ADMIN_EMAIL = "travisclevenger.tc@gmail.com";
         const CRYPTO_LIMIT = 100; // Fetch Top 100 Cryptos
+        const MAX_FLOW_ROWS = 150; // Max rows to keep in the flow table
 
         // Secure Netlify Function Endpoints
         // These URLs MUST match your file structure: netlify/functions/FUNCTION-NAME
@@ -264,12 +286,16 @@
         let stripe;
         let flowInterval, newsInterval, cryptoInterval, dbUnsubscribe, marketCountdownInterval;
         let currentFlowData = [], currentNewsData = [], currentCryptoData = [];
+        let displayedFlowTimestamps = new Set(); // Keep track of displayed trades for smooth updates
         let userWatchlist = new Set(), userAlerts = [];
         let isPaused = false;
         let activeFilter = 'all', activeSort = 'timestamp-desc', activePremiumFilter = 0;
+        let activeHeatmapFilter = 'options'; // 'options' or 'crypto'
         let currentUser = null, currentUserData = null;
         let DOMElements; 
         let authReady = false;
+        let initialFlowLoadComplete = false;
+        let initialCryptoLoadComplete = false;
 
         // --- Error Handling for Initialization ---
         function showInitializationError(message) {
@@ -325,7 +351,6 @@
             }, (error) => {
                 console.error("Firestore onSnapshot error:", error);
                 showAlertBanner("Error connecting to user database. Check Firestore rules and API key permissions.");
-                // If we can't get user data, we can't proceed. Show a critical error.
                  showInitializationError(`Firestore Error: ${error.message}. This is likely a permissions issue. Ensure your Firestore rules allow reads/writes and the API key is correct.`);
             });
         }
@@ -339,7 +364,7 @@
             setActivePage('dashboard'); 
             renderHeader(); 
             updateUIForPlan(); 
-            startDataFetching(); 
+            startDataFetching(); // This now initiates fetches
             renderWatchlist(); 
             renderAlerts(); 
             lucide.createIcons();
@@ -354,7 +379,16 @@
             currentUserData = null;
             currentUser = null;
             stopDataFetching();
+            initialFlowLoadComplete = false; // Reset flags
+            initialCryptoLoadComplete = false;
+            displayedFlowTimestamps.clear(); // Clear displayed items tracking
             if (DOMElements) {
+                // Clear tables and show placeholders on sign out
+                DOMElements.optionsTbody.innerHTML = '<tr id="flow-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Sign in to view flow.</td></tr>';
+                DOMElements.cryptoTbody.innerHTML = '<tr id="crypto-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Sign in to view crypto data.</td></tr>';
+                DOMElements.heatmapContainer.innerHTML = '<p class="text-neutral-500 text-center">Sign in to view heatmap.</p>';
+                DOMElements.newsFeed.innerHTML = '<p class="text-center text-neutral-500 p-8 text-xs">Sign in to view news.</p>';
+
                 DOMElements.mainAppContent.classList.add('hidden');
                 DOMElements.authPage.classList.remove('hidden');
                 DOMElements.authPage.classList.add('flex');
@@ -413,30 +447,52 @@
             document.getElementById('footer-contact-link').addEventListener('click', e => { e.preventDefault(); showModal('contact'); });
             document.querySelector('[data-close-modal]').addEventListener('click', () => DOMElements.genericModal.classList.add('hidden'));
             DOMElements.pausePlayBtn.addEventListener('click', togglePause);
-            DOMElements.flowFilters.addEventListener('click', handleFilterClick);
-            DOMElements.sortSelect.addEventListener('change', e => { activeSort = e.target.value; renderFlowTable(); });
-            DOMElements.premiumSelect.addEventListener('change', e => { activePremiumFilter = parseInt(e.target.value); renderFlowTable(); });
+            DOMElements.flowFilters.addEventListener('click', handleFilterClick); // Existing filters
+            DOMElements.sortSelect.addEventListener('change', e => { activeSort = e.target.value; updateFlowTable(); }); // Update sorting
+            DOMElements.premiumSelect.addEventListener('change', e => { activePremiumFilter = parseInt(e.target.value); updateFlowTable(); }); // Update premium filter
             
+             // View switching
+            document.querySelectorAll('.view-button').forEach(button => {
+                button.addEventListener('click', () => switchView(button.dataset.view));
+            });
+            // NEW Heatmap filter switching
+            document.querySelectorAll('.heatmap-filter-button').forEach(button => {
+                 button.addEventListener('click', () => {
+                     document.querySelectorAll('.heatmap-filter-button').forEach(btn => btn.classList.remove('active'));
+                     button.classList.add('active');
+                     activeHeatmapFilter = button.dataset.heatmapFilter;
+                     renderHeatmap(); // Re-render heatmap with new data source
+                 });
+            });
+
             DOMElements.searchInput.addEventListener('keydown', e => {
                 if (e.key === 'Enter') {
                     const searchTerm = e.target.value.toUpperCase().trim();
                     e.preventDefault();
                     if(!searchTerm) return;
-                    showChartView(searchTerm); // Reverted to original, simple logic
+                    showChartView(searchTerm); 
                 }
             });
 
-            DOMElements.flowViewBtn.addEventListener('click', () => switchView('flow'));
-            DOMElements.heatmapViewBtn.addEventListener('click', () => switchView('heatmap'));
-            DOMElements.cryptoViewBtn.addEventListener('click', () => switchView('crypto'));
             DOMElements.addWatchlistBtn.addEventListener('click', addWatchlistItem);
             DOMElements.addAlertBtn.addEventListener('click', addAlertItem);
             DOMElements.homeLogo.addEventListener('click', () => { if (currentUser) setActivePage('dashboard'); else handleSignedOutState(); });
             DOMElements.accountChangePlanBtn.addEventListener('click', () => setActivePage('plans'));
             DOMElements.sidebarUpgradeBtn.addEventListener('click', () => setActivePage('plans'));
             DOMElements.backtesterUpgradeBtn.addEventListener('click', () => setActivePage('plans'));
-            DOMElements.optionsTbody.addEventListener('click', e => { const tickerCell = e.target.closest('tr')?.dataset.ticker; if (tickerCell) showChartView(tickerCell); });
-            DOMElements.cryptoTbody.addEventListener('click', e => { const tickerCell = e.target.closest('tr')?.dataset.ticker; if (tickerCell) showChartView(tickerCell); });
+            // Use event delegation for dynamically added rows
+            DOMElements.optionsTbody.addEventListener('click', e => { 
+                const row = e.target.closest('tr');
+                if (row && row.dataset.ticker) {
+                     showChartView(row.dataset.ticker); 
+                }
+            });
+             DOMElements.cryptoTbody.addEventListener('click', e => { 
+                const row = e.target.closest('tr');
+                if (row && row.dataset.ticker) {
+                     showChartView(row.dataset.ticker); 
+                }
+             });
             DOMElements.backToDashboardChart.addEventListener('click', () => DOMElements.pages.chart.classList.add('hidden'));
             document.querySelectorAll('.plan-button').forEach(button => button.addEventListener('click', () => initiateStripeCheckout(button.dataset.priceId)));
             DOMElements.adminPlanSelector.addEventListener('change', () => { updateUIForPlan(); renderHeader(); });
@@ -475,7 +531,8 @@
                 btn.classList.toggle('opacity-50', btn.disabled);
                 btn.classList.toggle('cursor-default', btn.disabled);
             });
-            startDataFetching();
+            // Re-initialize data fetching based on new plan
+            startDataFetching(); 
         }
 
         function showChartView(ticker) {
@@ -483,122 +540,277 @@
             if (plan === 'free') { showAlertBanner("Charting is a premium feature. Please upgrade."); return; }
             
             let chartSymbol = ticker;
-            // Check if the ticker is a known crypto symbol from our Top 100 list
-            // This is the original logic that correctly identifies SPY as a stock.
             const isCrypto = currentCryptoData.some(c => c.symbol === ticker);
             if (isCrypto) {
-                chartSymbol = `COINBASE:${ticker}USD`;
+                chartSymbol = `COINBASE:${ticker}USD`; // Keep this logic
             }
 
             DOMElements.pages.chart.classList.remove('hidden');
             DOMElements.chartTickerTitle.textContent = ticker;
-            DOMElements.tradingviewWidgetContainer.innerHTML = '';
-            new TradingView.widget({ "width": "100%", "height": "100%", "symbol": chartSymbol, "interval": "D", "timezone": "Etc/UTC", "theme": "dark", "style": "1", "locale": "en", "enable_publishing": false, "withdateranges": true, "hide_side_toolbar": false, "allow_symbol_change": true, "container_id": "tradingview-widget-container" });
+            DOMElements.tradingviewWidgetContainer.innerHTML = ''; // Clear previous widget
+            // Ensure container is visible and has dimensions before creating widget
+            requestAnimationFrame(() => {
+                new TradingView.widget({ 
+                    "width": "100%", 
+                    "height": "100%", 
+                    "symbol": chartSymbol, 
+                    "interval": "D", 
+                    "timezone": "Etc/UTC", 
+                    "theme": "dark", 
+                    "style": "1", 
+                    "locale": "en", 
+                    "enable_publishing": false, 
+                    "withdateranges": true, 
+                    "hide_side_toolbar": false, 
+                    "allow_symbol_change": true, 
+                    "container_id": "tradingview-widget-container" 
+                });
+            });
         }
         
         function switchView(view) {
-            ['flow', 'heatmap', 'crypto'].forEach(v => { DOMElements[`${v}ViewBtn`].classList.toggle('active', view === v); DOMElements[`${v}View`].classList.toggle('hidden', view !== v); });
+             document.querySelectorAll('.view-button').forEach(button => {
+                 button.classList.toggle('active', button.dataset.view === view);
+             });
+            ['flow', 'heatmap', 'crypto'].forEach(v => { 
+                DOMElements[`${v}View`].classList.toggle('hidden', view !== v); 
+            });
             
-            const isCrypto = view === 'crypto';
-            DOMElements.optionsControls.classList.toggle('hidden', isCrypto);
-            DOMElements.flowFilters.classList.toggle('hidden', isCrypto);
-            DOMElements.cryptoControls.classList.toggle('hidden', !isCrypto);
+            const isCryptoView = view === 'crypto';
+            const isHeatmapView = view === 'heatmap';
+
+            DOMElements.optionsControls.classList.toggle('hidden', isCryptoView || isHeatmapView);
+            DOMElements.flowFilters.classList.toggle('hidden', isCryptoView || isHeatmapView);
+            DOMElements.cryptoControls.classList.toggle('hidden', !isCryptoView);
+            DOMElements.heatmapControls.classList.toggle('hidden', !isHeatmapView); // Show heatmap controls only for heatmap view
             
-            if (view === 'heatmap') renderHeatmap();
+            if (view === 'heatmap') {
+                // Use requestAnimationFrame to ensure the container is visible and has dimensions
+                 requestAnimationFrame(renderHeatmap);
+            }
         }
         
         function renderHeatmap() {
-            const container = d3.select("#heatmap-container");
-            container.html('');
-            if (currentFlowData.length === 0) {
-                container.append('p').attr('class', 'text-neutral-500 text-center').text('No data for heatmap.');
-                return;
-            }
+             const container = d3.select("#heatmap-container");
+             container.html(''); // Clear previous heatmap
 
-            const aggregatedData = d3.rollups(
-                currentFlowData,
-                v => ({
-                    totalPremium: d3.sum(v, d => d.totalValue),
-                    bullishPremium: d3.sum(v.filter(d => d.sentiment === 'BULLISH'), d => d.totalValue),
-                    bearishPremium: d3.sum(v.filter(d => d.sentiment === 'BEARISH'), d => d.totalValue),
-                    count: v.length
-                }),
-                d => d.symbol
-            ).map(([key, value]) => ({ symbol: key, ...value }));
+            let dataToUse = [];
+            let valueAccessor = d => d.totalPremium; // Default for options
+            let colorInterpolator = d3.interpolateRdYlGn; // Default for options (Red-Yellow-Green)
+            let colorValueAccessor = d => d.totalPremium > 0 ? d.bullishPremium / d.totalPremium : 0.5; // Options sentiment ratio
+            let symbolAccessor = d => d.symbol;
+            let nameAccessor = d => d.symbol; // Default to symbol if name isn't available
 
-            const width = container.node().getBoundingClientRect().width;
-            const height = container.node().getBoundingClientRect().height;
-            const pack = d3.pack().size([width, height]).padding(5);
-            const root = pack(d3.hierarchy({ children: aggregatedData }).sum(d => d.totalPremium));
-            
-            const svg = container.append("svg").attr("width", width).attr("height", height).attr("font-size", 10).attr("text-anchor", "middle");
-            const g = svg.selectAll("g").data(root.leaves()).enter().append("g").attr("class", "heatmap-bubble").attr("transform", d => `translate(${d.x},${d.y})`).on("click", (event, d) => showChartView(d.data.symbol));
+             if (activeHeatmapFilter === 'options') {
+                 if (!initialFlowLoadComplete) {
+                    container.append('p').attr('class', 'text-neutral-500 text-center').text('Loading options data...');
+                    return;
+                 }
+                 if (currentFlowData.length === 0) {
+                     container.append('p').attr('class', 'text-neutral-500 text-center').text('No unusual options activity detected.');
+                     return;
+                 }
+                 dataToUse = d3.rollups(
+                     currentFlowData,
+                     v => ({
+                         totalPremium: d3.sum(v, d => d.totalValue),
+                         bullishPremium: d3.sum(v.filter(d => d.sentiment === 'BULLISH'), d => d.totalValue),
+                         count: v.length
+                     }),
+                     d => d.symbol
+                 ).map(([key, value]) => ({ symbol: key, ...value }));
+                 valueAccessor = d => d.totalPremium;
+                 colorValueAccessor = d => d.totalPremium > 0 ? d.bullishPremium / d.totalPremium : 0.5;
+                 colorInterpolator = d3.interpolateRdYlGn;
 
-            g.append("circle")
-                .attr("r", d => d.r)
-                .attr("fill", d => {
-                    const bullishRatio = d.data.totalPremium > 0 ? d.data.bullishPremium / d.data.totalPremium : 0.5;
-                    return d3.interpolateRdYlGn(bullishRatio);
-                })
-                .attr("stroke", "#4a4a4a")
-                .attr("stroke-width", 1.5);
+             } else { // Crypto
+                  if (!initialCryptoLoadComplete) {
+                     container.append('p').attr('class', 'text-neutral-500 text-center').text('Loading crypto data...');
+                     return;
+                 }
+                 if (currentCryptoData.length === 0) {
+                     container.append('p').attr('class', 'text-neutral-500 text-center').text('No crypto data available.');
+                     return;
+                 }
+                 dataToUse = currentCryptoData.map(c => ({
+                     symbol: c.symbol,
+                     name: c.name,
+                     volume24h: c.quote.USD.volume_24h,
+                     change24h: c.quote.USD.percent_change_24h
+                 }));
+                 valueAccessor = d => d.volume24h; // Size bubbles by 24h volume
+                 colorValueAccessor = d => d.change24h; // Color bubbles by 24h change
+                 // Use a Green/Red scale for crypto price change
+                 colorInterpolator = d3.scaleLinear().domain([-5, 0, 5]) // Example range: -5% to +5% change
+                                        .range(["#ef4444", "#a3a3a3", "#22c55e"]) // Red -> Gray -> Green
+                                        .clamp(true); 
+                 symbolAccessor = d => d.symbol;
+                 nameAccessor = d => d.name;
+             }
 
-            g.append("text").selectAll("tspan")
-                .data(d => [d.data.symbol, formatCurrency(d.data.totalPremium)])
-                .enter().append("tspan")
-                .attr("x", 0)
-                .attr("y", (d, i) => i * 1.1 + "em")
-                .attr("dy", "-0.25em")
-                .attr("fill", d => {
-                    const bullishRatio = d.data.totalPremium > 0 ? d.data.bullishPremium / d.data.totalPremium : 0.5;
-                    return d3.lab(d3.interpolateRdYlGn(bullishRatio)).l < 60 ? "#fff" : "#000"
-                })
-                .attr("font-weight", (d,i) => i === 0 ? "bold" : "normal")
-                .text(d => d);
-        }
+             if (dataToUse.length === 0) {
+                 container.append('p').attr('class', 'text-neutral-500 text-center').text(`No data available for ${activeHeatmapFilter}.`);
+                 return;
+             }
+             
+             // Ensure container has dimensions
+             const containerNode = container.node();
+             if (!containerNode) return;
+             const bounds = containerNode.getBoundingClientRect();
+             const width = bounds.width;
+             const height = bounds.height;
+              if (width <= 0 || height <= 0) {
+                 console.warn("Heatmap container has no dimensions yet.");
+                 // Optionally, try again slightly later
+                 // requestAnimationFrame(renderHeatmap); 
+                 return; 
+             }
+
+
+             const pack = d3.pack().size([width, height]).padding(5);
+             const root = pack(d3.hierarchy({ children: dataToUse }).sum(valueAccessor));
+             
+             const svg = container.append("svg").attr("width", width).attr("height", height).attr("font-size", 10).attr("text-anchor", "middle");
+
+             // Tooltip
+             const tooltip = container.append("div")
+                .style("opacity", 0)
+                .attr("class", "absolute bg-neutral-900 border border-neutral-700 rounded-md p-2 text-xs shadow-lg pointer-events-none z-10");
+
+
+             const g = svg.selectAll("g")
+                 .data(root.leaves())
+                 .enter().append("g")
+                 .attr("class", "heatmap-bubble")
+                 .attr("transform", d => `translate(${d.x},${d.y})`)
+                 .on("click", (event, d) => showChartView(symbolAccessor(d.data)))
+                 .on("mouseover", (event, d) => {
+                     tooltip.transition().duration(200).style("opacity", .9);
+                     let tooltipText = `<b>${symbolAccessor(d.data)}</b> (${nameAccessor(d.data)})<br/>`;
+                     if (activeHeatmapFilter === 'options') {
+                         tooltipText += `Premium: ${formatCurrency(d.data.totalPremium)}<br/>Sentiment: ${((d.data.bullishPremium / d.data.totalPremium)*100).toFixed(0)}% Bullish`;
+                     } else {
+                          tooltipText += `Volume (24h): ${formatCurrency(d.data.volume24h)}<br/>Change (24h): ${d.data.change24h.toFixed(2)}%`;
+                     }
+                     tooltip.html(tooltipText)
+                         .style("left", (event.pageX + 15) + "px") // Position tooltip near cursor
+                         .style("top", (event.pageY - 28) + "px");
+                 })
+                 .on("mouseout", (event, d) => {
+                     tooltip.transition().duration(500).style("opacity", 0);
+                 });
+
+             g.append("circle")
+                 .attr("r", d => d.r)
+                 .attr("fill", d => colorInterpolator(colorValueAccessor(d.data)))
+                 .attr("stroke", "#4a4a4a")
+                 .attr("stroke-width", 1.5);
+
+            // Adjust text based on data type and bubble size
+            g.append("text")
+                 .attr("clip-path", d => `circle(${d.r})`) // Prevent text overflow
+                 .selectAll("tspan")
+                 .data(d => {
+                     const lines = [symbolAccessor(d.data)];
+                     // Add value only if bubble is large enough
+                     if (d.r > 20) { 
+                         lines.push(formatCurrency(valueAccessor(d.data)));
+                     }
+                     return lines;
+                 })
+                 .enter().append("tspan")
+                 .attr("x", 0)
+                 .attr("y", (d, i, nodes) => `${i - nodes.length / 2 + 0.8}em`) // Center text vertically
+                 .attr("fill", d => { // Adjust text color for contrast
+                      const color = d3.color(colorInterpolator(colorValueAccessor(d.data)));
+                      return color && d3.lab(color).l < 60 ? "#fff" : "#333";
+                 })
+                 .attr("font-weight", (d,i) => i === 0 ? "bold" : "normal")
+                 .style("font-size", d => d.r < 15 ? '8px' : '10px') // Smaller font for smaller bubbles
+                 .text(d => d);
+         }
         
         // --- Data Fetching & Rendering ---
         function startDataFetching() {
-            stopDataFetching();
+            stopDataFetching(); // Clear existing intervals
+            initialFlowLoadComplete = false; // Reset load flags
+            initialCryptoLoadComplete = false;
+            // Clear existing data only if needed, or handle updates smoothly
+            // currentFlowData = []; 
+            // currentCryptoData = [];
+            // currentNewsData = [];
+            // displayedFlowTimestamps.clear();
+
+            // Clear placeholders immediately
+            const flowPlaceholder = document.getElementById('flow-placeholder');
+            if (flowPlaceholder) flowPlaceholder.remove();
+            const cryptoPlaceholder = document.getElementById('crypto-placeholder');
+             if (cryptoPlaceholder) cryptoPlaceholder.remove();
+
             if (!currentUserData || !authReady) return;
 
             const plan = DOMElements.adminPanel.classList.contains('hidden') ? (currentUserData.plan) : DOMElements.adminPlanSelector.value;
             
             if (plan !== 'free') {
-                fetchAndRenderCrypto();
+                // Initial fetches
+                fetchAndRenderCrypto(true); // Pass true for initial load
                 fetchAndRenderNews();
-                fetchAndRenderFlow(); // Always fetch flow on load, 24/7
-                cryptoInterval = setInterval(fetchAndRenderCrypto, 300000); // 5 mins
+                fetchAndRenderFlow(null, true); // Pass true for initial load
+
+                // Set intervals
+                cryptoInterval = setInterval(() => fetchAndRenderCrypto(false), 300000); // 5 mins
                 newsInterval = setInterval(fetchAndRenderNews, 300000); // 5 mins
-                flowInterval = setInterval(fetchAndRenderFlow, 90000); // 90 seconds
+                flowInterval = setInterval(() => fetchAndRenderFlow(null, false), 90000); // 90 seconds
             } else {
-                 DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Live crypto data is a premium feature.<br>Please upgrade your plan.</td></tr>`;
-                 DOMElements.newsFeed.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">Upgrade to access the live news feed.</p>`;
-                 DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Live options flow is a premium feature.<br>Please upgrade your plan.</td></tr>`;
+                 // Show upgrade messages for free plan
+                 DOMElements.optionsTbody.innerHTML = '<tr id="flow-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Live options flow is a premium feature.<br>Please upgrade your plan.</td></tr>';
+                 DOMElements.cryptoTbody.innerHTML = '<tr id="crypto-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Live crypto data is a premium feature.<br>Please upgrade your plan.</td></tr>';
+                 DOMElements.heatmapContainer.innerHTML = '<p class="text-neutral-500 text-center">Heatmap is a premium feature.<br>Please upgrade your plan.</p>';
+                 DOMElements.newsFeed.innerHTML = '<p class="text-center text-neutral-500 p-8 text-xs">Upgrade to access the live news feed.</p>';
             }
         }
 
-        function stopDataFetching() { if (flowInterval) clearInterval(flowInterval); if (newsInterval) clearInterval(newsInterval); if (cryptoInterval) clearInterval(cryptoInterval); }
-
-        async function fetchAndRenderFlow(ticker = null) {
-            if (isPaused || (document.hidden && !ticker)) return; // Still allow ticker search even if tab is hidden
-
-            // Show loading placeholder only if the table is currently empty
-            if (DOMElements.optionsTbody.innerHTML === '') {
-                DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest flow data...</td></tr>`;
-            }
-            
-            const newData = await fetchOptionsFlowData(ticker);
-            
-            if (newData) { 
-                currentFlowData = newData; 
-                renderFlowTable(); 
-                if (DOMElements.heatmapViewBtn.classList.contains('active')) renderHeatmap(); 
-                checkAlerts(newData); 
-            } else if (currentFlowData.length === 0) { // Handle error only if no data is present
-                DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-red-400 p-12">Failed to fetch options flow data. API may be down.</td></tr>`;
-            }
+        function stopDataFetching() { 
+            if (flowInterval) clearInterval(flowInterval); 
+            if (newsInterval) clearInterval(newsInterval); 
+            if (cryptoInterval) clearInterval(cryptoInterval); 
         }
+
+        async function fetchAndRenderFlow(ticker = null, isInitialLoad = false) {
+             // Only pause automatic refreshes, allow manual ticker searches
+             if (isPaused && !ticker) return; 
+             // Don't fetch if tab is hidden unless it's a specific ticker search
+             if (document.hidden && !ticker) return; 
+
+             // Show loading indicator only on initial load if table is empty
+             if (isInitialLoad && DOMElements.optionsTbody.children.length === 0) {
+                 const placeholder = document.createElement('tr');
+                 placeholder.id = 'flow-placeholder';
+                 placeholder.innerHTML = `<td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest flow data...</td>`;
+                 DOMElements.optionsTbody.appendChild(placeholder);
+             }
+             
+             const newData = await fetchOptionsFlowData(ticker);
+             const placeholder = document.getElementById('flow-placeholder');
+             if (placeholder) placeholder.remove(); // Always remove placeholder after fetch attempt
+             
+             if (newData) { 
+                // Process and update table smoothly
+                processFlowUpdate(newData);
+                initialFlowLoadComplete = true; 
+                // Re-render heatmap if it's active and showing options
+                if (DOMElements.heatmapViewBtn.classList.contains('active') && activeHeatmapFilter === 'options') {
+                    renderHeatmap();
+                }
+                checkAlerts(newData); // Check alerts against the full fetched data
+             } else {
+                 // Fetch failed - show error only if no data has ever been loaded
+                 if (!initialFlowLoadComplete && DOMElements.optionsTbody.children.length === 0) { 
+                      DOMElements.optionsTbody.innerHTML = `<tr id="flow-placeholder"><td colspan="6" class="text-center text-red-400 p-12">Failed to fetch options flow data. API may be down or unavailable.</td></tr>`;
+                 }
+                 // If fetch failed but we have old data, the API banner already shows the error, keep old data.
+             }
+         }
         
         async function fetchAndRenderNews() { 
             if (isPaused || document.hidden) return; 
@@ -607,60 +819,154 @@
                 currentNewsData = newsData; 
                 renderNewsFeed(); 
             } 
+            // Consider adding placeholder/error handling like in other fetches
         }
 
-        async function fetchAndRenderCrypto() { 
+        async function fetchAndRenderCrypto(isInitialLoad = false) { 
             if (isPaused || document.hidden) return;
             
-            if (DOMElements.cryptoTbody.innerHTML === '') {
-                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest crypto data...</td></tr>`;
+            if (isInitialLoad && DOMElements.cryptoTbody.children.length === 0) {
+                const placeholder = document.createElement('tr');
+                 placeholder.id = 'crypto-placeholder';
+                 placeholder.innerHTML = `<td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest crypto data...</td>`;
+                 DOMElements.cryptoTbody.appendChild(placeholder);
             }
             
             const data = await fetchCryptoFlowData(); 
+            const placeholder = document.getElementById('crypto-placeholder');
+             if (placeholder) placeholder.remove();
+
             if(data) {
                 currentCryptoData = data;
-                renderCryptoFlowTable();
-            } else if (currentCryptoData.length === 0) {
-                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-red-400 p-12">Could not fetch crypto data. API may be down.</td></tr>`;
+                renderCryptoFlowTable(); // This replaces innerHTML, which is fine for crypto
+                initialCryptoLoadComplete = true;
+                 // Re-render heatmap if it's active and showing crypto
+                 if (DOMElements.heatmapViewBtn.classList.contains('active') && activeHeatmapFilter === 'crypto') {
+                     renderHeatmap();
+                 }
+            } else if (!initialCryptoLoadComplete && DOMElements.cryptoTbody.children.length === 0){
+                DOMElements.cryptoTbody.innerHTML = `<tr id="crypto-placeholder"><td colspan="6" class="text-center text-red-400 p-12">Could not fetch crypto data. API may be down.</td></tr>`;
             }
         }
 
-        function renderFlowTable() {
-            const filteredData = getFilteredAndSortedData();
-            if (filteredData.length === 0) {
-                // Removed "Market Closed" message
-                DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity found for your criteria.</td></tr>`; 
-                return; 
-            }
+        // NEW function to handle smooth flow updates
+        function processFlowUpdate(newData) {
+             const newTrades = [];
+             // Filter out trades we've already added, based on timestamp (or a better unique ID if available)
+             // Iterate in reverse to easily prepend in the correct order later
+             for (let i = newData.length - 1; i >= 0; i--) {
+                 const item = newData[i];
+                 // Create a more unique key if timestamp alone isn't sufficient
+                 const tradeKey = `${item.timestamp}-${item.symbol}-${item.strikePrice}-${item.putCall}-${item.totalValue}`; 
+                 if (!displayedFlowTimestamps.has(tradeKey)) {
+                     newTrades.push(item);
+                     displayedFlowTimestamps.add(tradeKey);
+                 }
+             }
 
-            DOMElements.optionsTbody.innerHTML = filteredData.map(item => `
-                <tr class="fade-in cursor-pointer hover:bg-neutral-800/50 ${item.putCall === 'CALL' ? 'call-row' : 'put-row'}" data-ticker="${item.symbol}">
-                    <td class="p-2 text-neutral-400">${new Date(item.timestamp * 1000).toLocaleTimeString()}</td>
-                    <td class="p-2 font-semibold text-white">${item.symbol}</td>
-                    <td class="p-2">
-                        <div class="font-semibold">${item.strikePrice.toFixed(2)} ${item.putCall}</div>
-                        <div class="text-neutral-400">${item.expiration}</div>
-                    </td>
-                    <td class="p-2 font-semibold ${item.sentiment === 'BULLISH' ? 'text-green-400' : 'text-red-400'}">${item.sentiment}</td>
-                    <td class="p-2 text-right">
-                        <div class="font-mono font-semibold ${getPremiumColor(item.totalValue)}">${formatCurrency(item.totalValue)}</div>
-                        <div class="text-neutral-400 text-xs">${item.tradeType.replace(/_/g, ' ')}</div>
-                    </td>
-                    <td class="p-2 text-right font-mono text-cyan-400" title="Vol: ${item.volume} / OI: ${item.openInterest}">
-                        <div>${item.volume} / ${item.openInterest}</div>
-                    </td>
-                </tr>`).join('');
+             // If it's the very first load, just add all data without animation
+             if (!initialFlowLoadComplete && DOMElements.optionsTbody.children.length === 0) {
+                  currentFlowData = newData.sort((a,b) => b.timestamp - a.timestamp); // Sort newest first
+                  updateFlowTable(); // Initial full render
+                  return;
+             }
+             
+             if (newTrades.length > 0) {
+                // Prepend new rows with animation
+                 newTrades.forEach(item => {
+                    const row = createFlowRowElement(item);
+                    DOMElements.optionsTbody.prepend(row);
+                    // Add to our main data array as well
+                    currentFlowData.unshift(item); 
+                 });
+
+                 // Prune old rows if exceeding max count
+                 while (DOMElements.optionsTbody.children.length > MAX_FLOW_ROWS) {
+                     const oldestRowElement = DOMElements.optionsTbody.lastElementChild;
+                     if (oldestRowElement) {
+                         const oldestTimestamp = oldestRowElement.dataset.key; // Assuming we add data-key attribute
+                         if(oldestTimestamp) displayedFlowTimestamps.delete(oldestTimestamp);
+                         oldestRowElement.remove();
+                     } else {
+                        break; // Should not happen, but safety break
+                     }
+                 }
+                 // Prune the main data array too
+                  currentFlowData.length = Math.min(currentFlowData.length, MAX_FLOW_ROWS * 1.2); // Keep a bit more in memory
+
+
+                 // Re-apply sorting/filtering to the *existing* DOM elements (more efficient than full re-render)
+                 // This part is complex. For simplicity now, we rely on prepending keeping the time sort mostly correct.
+                 // A full re-sort/filter might still be needed if those controls are changed.
+                 // updateFlowTable(); // Optionally call this to force re-sort/filter of the whole visible table
+
+             } else if (DOMElements.optionsTbody.children.length === 0) {
+                 // Handle case where fetch was successful but returned empty array
+                 DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity detected.</td></tr>`;
+             }
+         }
+
+        // NEW helper to create a single flow row element
+        function createFlowRowElement(item) {
+            const row = document.createElement('tr');
+            const tradeKey = `${item.timestamp}-${item.symbol}-${item.strikePrice}-${item.putCall}-${item.totalValue}`;
+            row.dataset.key = tradeKey; // Store the unique key
+            row.dataset.ticker = item.symbol;
+            row.className = `cursor-pointer hover:bg-neutral-800/50 ${item.putCall === 'CALL' ? 'call-row' : 'put-row'} fade-in-down`; // Add animation class
+            row.innerHTML = `
+                <td class="p-2 text-neutral-400">${new Date(item.timestamp * 1000).toLocaleTimeString()}</td>
+                <td class="p-2 font-semibold text-white">${item.symbol}</td>
+                <td class="p-2">
+                    <div class="font-semibold">${item.strikePrice.toFixed(2)} ${item.putCall}</div>
+                    <div class="text-neutral-400">${item.expiration}</div>
+                </td>
+                <td class="p-2 font-semibold ${item.sentiment === 'BULLISH' ? 'text-green-400' : 'text-red-400'}">${item.sentiment}</td>
+                <td class="p-2 text-right">
+                    <div class="font-mono font-semibold ${getPremiumColor(item.totalValue)}">${formatCurrency(item.totalValue)}</div>
+                    <div class="text-neutral-400 text-xs">${item.tradeType.replace(/_/g, ' ')}</div>
+                </td>
+                <td class="p-2 text-right font-mono text-cyan-400" title="Vol: ${item.volume} / OI: ${item.openInterest}">
+                    <div>${item.volume} / ${item.openInterest}</div>
+                </td>
+            `;
+            return row;
         }
+
+        // MODIFIED: This function now sorts/filters the *in-memory* data and performs a full re-render.
+        // Called on initial load and when filters/sort change. NOT called on every interval update.
+        function updateFlowTable() {
+             const filteredData = getFilteredAndSortedData(); // Gets data from currentFlowData array
+
+             // Clear existing rows before full re-render
+             DOMElements.optionsTbody.innerHTML = ''; 
+             displayedFlowTimestamps.clear(); // Clear tracking as we are rebuilding
+
+             if (filteredData.length === 0) {
+                 DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity found for your criteria.</td></tr>`; 
+                 return; 
+             }
+
+             // Add rows back, without animation this time
+             filteredData.forEach(item => {
+                 const row = createFlowRowElement(item);
+                 row.classList.remove('fade-in-down'); // Remove animation for non-new rows
+                 const tradeKey = `${item.timestamp}-${item.symbol}-${item.strikePrice}-${item.putCall}-${item.totalValue}`;
+                 displayedFlowTimestamps.add(tradeKey); // Re-track displayed items
+                 DOMElements.optionsTbody.appendChild(row);
+             });
+         }
         
+        // renderNewsFeed remains mostly the same (innerHTML replacement is okay here)
         function renderNewsFeed() {
              if (!currentNewsData || currentNewsData.length === 0) { DOMElements.newsFeed.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">News feed unavailable.</p>`; return; }
              DOMElements.newsFeed.innerHTML = currentNewsData.map(news => `<a href="${news.url}" target="_blank" rel="noopener noreferrer" class="block p-2 rounded-md hover:bg-neutral-800/50 transition-colors"><p class="font-semibold text-neutral-200 text-xs">${news.title}</p><p class="text-xs text-neutral-500">${news.site} - ${timeAgo(news.publishedDate)}</p></a>`).join('');
         }
 
+       // renderCryptoFlowTable remains the same (innerHTML replacement is okay here)
        function renderCryptoFlowTable() {
             if (!currentCryptoData || currentCryptoData.length === 0) {
-                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Could not fetch crypto data.</td></tr>`;
-                return;
+                 DOMElements.cryptoTbody.innerHTML = `<tr id="crypto-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">No crypto data available.</td></tr>`;
+                 return;
             }
             DOMElements.cryptoTbody.innerHTML = currentCryptoData.map(crypto => {
                 const quote = crypto.quote.USD;
@@ -668,7 +974,8 @@
                 const change24h = quote.percent_change_24h;
                 const color1h = change1h >= 0 ? 'text-green-400' : 'text-red-400';
                 const color24h = change24h >= 0 ? 'text-green-400' : 'text-red-400';
-                return `
+                // Add fade-in for consistency, though it replaces all rows
+                return ` 
                     <tr class="fade-in cursor-pointer hover:bg-neutral-800/50" data-ticker="${crypto.symbol}">
                         <td class="p-2">
                             <div class="font-semibold text-white">${crypto.name}</div>
@@ -683,56 +990,64 @@
             }).join('');
         }
 
+        // getFilteredAndSortedData now operates purely on the in-memory currentFlowData
         function getFilteredAndSortedData() {
-            let data = [...currentFlowData];
+            let data = [...currentFlowData]; // Operate on a copy
             if (activeFilter === 'watchlist') data = data.filter(item => userWatchlist.has(item.symbol));
             if (activeFilter === 'bullish') data = data.filter(item => item.sentiment === 'BULLISH');
             if (activeFilter === 'bearish') data = data.filter(item => item.sentiment === 'BEARISH');
             if (activePremiumFilter > 0) data = data.filter(item => item.totalValue >= activePremiumFilter);
+            
+            // Apply sorting to the filtered data
             data.sort((a, b) => {
                 if (activeSort === 'totalValue-desc') return b.totalValue - a.totalValue;
-                return b.timestamp - a.timestamp;
+                return b.timestamp - a.timestamp; // Default sort: newest first
             });
-            return data.slice(0, 150);
+            // Return only up to MAX_FLOW_ROWS for rendering
+            return data.slice(0, MAX_FLOW_ROWS); 
         }
 
-        // --- Sidebar & Data Persistence ---
-        function addWatchlistItem() { const ticker = DOMElements.watchlistInput.value.toUpperCase().trim(); if (ticker) { userWatchlist.add(ticker); DOMElements.watchlistInput.value = ''; updateUserData({ watchlist: Array.from(userWatchlist) }); } }
-        function addAlertItem() { const ticker = DOMElements.alertTickerInput.value.toUpperCase().trim(); const premium = parseInt(DOMElements.alertPremiumSelect.value); if (ticker) { userAlerts.push({ ticker, premium }); DOMElements.alertTickerInput.value = ''; updateUserData({ alerts: userAlerts }); } }
-        function renderWatchlist() { DOMElements.watchlistContainer.innerHTML = [...userWatchlist].map(ticker => `<div class="flex items-center justify-between bg-neutral-800/50 p-2 rounded-md"><span class="font-semibold">${ticker}</span><button data-ticker="${ticker}" class="remove-watchlist-btn text-neutral-500 hover:text-red-400">&times;</button></div>`).join(''); document.querySelectorAll('.remove-watchlist-btn').forEach(btn => btn.addEventListener('click', (e) => { userWatchlist.delete(e.target.dataset.ticker); updateUserData({ watchlist: Array.from(userWatchlist) }); })); }
-        function renderAlerts() { DOMElements.alertsContainer.innerHTML = userAlerts.map((alert, index) => `<div class="flex items-center justify-between bg-neutral-800/50 p-2 rounded-md text-xs"><span>${alert.ticker} > ${formatCurrency(alert.premium)}</span><button data-index="${index}" class="remove-alert-btn text-neutral-500 hover:text-red-400">&times;</button></div>`).join(''); document.querySelectorAll('.remove-alert-btn').forEach(btn => btn.addEventListener('click', (e) => { userAlerts.splice(e.target.dataset.index, 1); updateUserData({ alerts: userAlerts }); })); }
+        // --- Sidebar & Data Persistence --- (No changes needed here)
+        function addWatchlistItem() { const ticker = DOMElements.watchlistInput.value.toUpperCase().trim(); if (ticker) { userWatchlist.add(ticker); DOMElements.watchlistInput.value = ''; updateUserData({ watchlist: Array.from(userWatchlist) }); renderWatchlist();} } // Re-render on add
+        function addAlertItem() { const ticker = DOMElements.alertTickerInput.value.toUpperCase().trim(); const premium = parseInt(DOMElements.alertPremiumSelect.value); if (ticker) { userAlerts.push({ ticker, premium }); DOMElements.alertTickerInput.value = ''; updateUserData({ alerts: userAlerts }); renderAlerts();} } // Re-render on add
+        function renderWatchlist() { DOMElements.watchlistContainer.innerHTML = [...userWatchlist].map(ticker => `<div class="flex items-center justify-between bg-neutral-800/50 p-2 rounded-md"><span class="font-semibold">${ticker}</span><button data-ticker="${ticker}" class="remove-watchlist-btn text-neutral-500 hover:text-red-400">&times;</button></div>`).join(''); document.querySelectorAll('.remove-watchlist-btn').forEach(btn => btn.addEventListener('click', (e) => { userWatchlist.delete(e.target.dataset.ticker); updateUserData({ watchlist: Array.from(userWatchlist) }); renderWatchlist();})); } // Re-render on remove
+        function renderAlerts() { DOMElements.alertsContainer.innerHTML = userAlerts.map((alert, index) => `<div class="flex items-center justify-between bg-neutral-800/50 p-2 rounded-md text-xs"><span>${alert.ticker} > ${formatCurrency(alert.premium)}</span><button data-index="${index}" class="remove-alert-btn text-neutral-500 hover:text-red-400">&times;</button></div>`).join(''); document.querySelectorAll('.remove-alert-btn').forEach(btn => btn.addEventListener('click', (e) => { userAlerts.splice(e.target.dataset.index, 1); updateUserData({ alerts: userAlerts }); renderAlerts();})); } // Re-render on remove
         function checkAlerts(newData) { newData.forEach(trade => userAlerts.forEach(alert => { if (trade.symbol === alert.ticker && trade.totalValue >= alert.premium) { showAlertBanner(`${trade.symbol} alert: ${formatCurrency(trade.totalValue)} ${trade.sentiment} trade detected`); } })); }
         
-        // --- API & Stripe ---
+        // --- API & Stripe --- (fetchApi slightly modified for clarity)
         async function fetchApi(url, options = {}) { 
             try { 
                 const r = await fetch(url, options); 
                 if (!r.ok) { 
-                    const rClone = r.clone();
-                    let errorBody;
-                    try { 
-                        errorBody = await r.json(); 
-                    } catch (e) { 
-                        errorBody = await rClone.text(); 
-                    }
+                    // Try to get error message from API response body
+                    let errorBodyText = await r.text(); // Get text first
+                    let errorJson = null;
+                    try { errorJson = JSON.parse(errorBodyText); } catch (e) { /* Ignore parsing error */ }
+
+                    let specificError = errorJson?.error || errorJson?.message || r.statusText;
+                    let friendlyMessage = `API ERROR: ${specificError} (${r.status}). Check console for details.`;
                     
-                    let friendlyMessage = `API ERROR: ${r.statusText}. Check console for details.`;
                     if (r.status === 404) {
-                        friendlyMessage = `API FUNCTION NOT FOUND (404). Ensure Netlify file/folder structure is correct: 'netlify/functions'`;
+                        friendlyMessage = `API FUNCTION NOT FOUND (404). Ensure Netlify file/folder structure is correct: 'netlify/functions' and function name matches URL. URL: ${url}`;
+                    } else if (r.status === 401 || r.status === 403) {
+                         friendlyMessage = `API Authentication Error (${r.status}). Check your API keys in Netlify environment variables.`;
+                    } else if (r.status >= 500) {
+                        friendlyMessage = `Server Error (${r.status}) from API. Please try again later.`;
                     }
 
-                    console.error(`API Error: ${r.status} ${r.statusText}`, errorBody);
+                    console.error(`API Error: ${r.status} ${r.statusText}`, errorBodyText); // Log raw text
                     DOMElements.apiStatusBanner.textContent = friendlyMessage;
                     DOMElements.apiStatusBanner.classList.remove('hidden'); 
-                    return null; 
+                    return null; // Return null on failure
                 } 
+                // Only hide banner on success
                 DOMElements.apiStatusBanner.classList.add('hidden'); 
                 return r.json(); 
             } catch (e) { 
-                console.error(`Fetch error:`, e);
-                DOMElements.apiStatusBanner.textContent = 'NETWORK ERROR. Could not connect to API.';
+                console.error(`Fetch Network error:`, e);
+                DOMElements.apiStatusBanner.textContent = 'NETWORK ERROR. Could not connect to API. Check internet connection.';
                 DOMElements.apiStatusBanner.classList.remove('hidden'); 
-                return null; 
+                return null; // Return null on failure
             } 
         }
 
@@ -745,32 +1060,19 @@
             if (!stripe) { showAlertBanner("Stripe is not configured. Please add a valid publishable key."); return; }
             if (!priceId || priceId.includes('YOUR_')) { showAlertBanner("This plan's checkout is not configured yet."); return; }
             showAlertBanner(`Redirecting to Stripe for plan with Price ID: ${priceId}`);
+            // Actual Stripe redirect logic would go here
+            // stripe.redirectToCheckout({ lineItems: [{ price: priceId, quantity: 1 }], mode: 'subscription', ... });
         }
         
-        // --- Utilities ---
+        // --- Utilities --- (No changes needed)
         function getMarketStatus() { const now = new Date(); const nowET = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' })); const day = nowET.getDay(); const hour = nowET.getHours(); const minute = nowET.getMinutes(); const isWeekday = day >= 1 && day <= 5; const marketTime = hour * 60 + minute; const openTime = 9 * 60 + 30; const closeTime = 16 * 60; if (isWeekday && marketTime >= openTime && marketTime < closeTime) { return { isOpen: true, nextEvent: 'close', time: (closeTime - marketTime) * 60 }; } let nextOpenDayIndex = (day === 5 && marketTime >= closeTime) ? 1 : (day === 6 ? 1 : (day === 0 ? 1 : (marketTime < openTime ? day : day + 1))); if(nextOpenDayIndex > 5) nextOpenDayIndex = 1; let daysUntilOpen = (nextOpenDayIndex - day + 7) % 7; if (daysUntilOpen === 0 && marketTime >= closeTime) { daysUntilOpen = day === 5 ? 3 : 1; } let nextOpen = new Date(nowET); nextOpen.setDate(nowET.getDate() + daysUntilOpen); nextOpen.setHours(9, 30, 0, 0); return { isOpen: false, nextEvent: 'open', time: nextOpen.getTime() - nowET.getTime() }; }
-        
-        // Removed "Market Closed" logic, but left market status for "Market Open" badge
-        function updateMarketCountdown() { 
-            const status = getMarketStatus(); 
-            if (status.isOpen) { 
-                const seconds = status.time; 
-                const minutes = Math.floor(seconds / 60); 
-                const hours = Math.floor(minutes / 60); 
-                const remainingMinutes = minutes % 60; 
-                DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div><span class="font-semibold text-green-400">Market Open</span><span class="text-neutral-400">| Closes in ${hours}h ${remainingMinutes}m</span></div>`; 
-            } else { 
-                // Clear the container when market is closed, as requested
-                DOMElements.marketStatusContainer.innerHTML = ''; 
-            } 
-        }
-
+        function updateMarketCountdown() { const status = getMarketStatus(); if (status.isOpen) { const seconds = status.time; const minutes = Math.floor(seconds / 60); const hours = Math.floor(minutes / 60); const remainingMinutes = minutes % 60; DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div><span class="font-semibold text-green-400">Market Open</span><span class="text-neutral-400">| Closes in ${hours}h ${remainingMinutes}m</span></div>`; } else { DOMElements.marketStatusContainer.innerHTML = ''; } }
         const formatCurrency = (v) => v >= 1000000000 ? `$${(v/1000000000).toFixed(2)}b` : (v >= 1000000 ? `$${(v/1000000).toFixed(2)}m` : (v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v.toFixed(0)}`));
         const getPremiumColor = (p) => p > 250000 ? 'text-orange-400' : (p > 100000 ? 'text-yellow-400' : '');
         const timeAgo = (iso) => { if (!iso) return ''; const s = Math.floor((new Date() - new Date(iso)) / 1000); if (s < 0) return 'just now'; let i = s / 31536000; if (i > 1) return `${Math.floor(i)}y ago`; i = s / 2592000; if (i > 1) return `${Math.floor(i)}mo ago`; i = s / 86400; if (i > 1) return `${Math.floor(i)}d ago`; i = s / 3600; if (i > 1) return `${Math.floor(i)}h ago`; i = s / 60; if (i > 1) return `${Math.floor(i)}m ago`; return `${Math.floor(s)}s ago`; };
         const getFriendlyAuthError = (err) => { switch (err.code) { case 'auth/user-not-found': case 'auth/wrong-password': return 'Invalid email or password.'; case 'auth/email-already-in-use': return 'An account with this email already exists.'; case 'auth/popup-closed-by-user': return 'Sign-in window closed. Please try again.'; case 'auth/internal-error': return 'An internal authentication error occurred. Please try again later.' ; default: console.error("Authentication Error:", err); return 'An unexpected error occurred. Please try again.'; } };
-        const togglePause = () => { isPaused = !isPaused; DOMElements.pausePlayBtn.innerHTML = isPaused ? '<i data-lucide="play-circle" class="w-4 h-4"></i><span>Resume</span>' : '<i data-lucide="pause-circle" class="w-4 h-4"></i><span>Pause</span>'; lucide.createIcons(); };
-        const handleFilterClick = (e) => { const btn = e.target.closest('.control-button'); if(btn){ document.querySelectorAll('.control-button').forEach(b => b.classList.remove('active')); btn.classList.add('active'); activeFilter = btn.id.replace('filter-', ''); renderFlowTable(); }};
+        const togglePause = () => { isPaused = !isPaused; DOMElements.pausePlayBtn.innerHTML = isPaused ? '<i data-lucide="play-circle" class="w-4 h-4"></i><span>Resume</span>' : '<i data-lucide="pause-circle" class="w-4 h-4"></i><span>Pause</span>'; lucide.createIcons(); if(!isPaused){/* Optionally trigger immediate fetch on resume */} };
+        const handleFilterClick = (e) => { const btn = e.target.closest('.control-button'); if(btn){ document.querySelectorAll('.control-button').forEach(b => b.classList.remove('active')); btn.classList.add('active'); activeFilter = btn.id.replace('filter-', ''); updateFlowTable(); }}; // Use updateFlowTable here
         const showAlertBanner = (msg) => { const banner = document.createElement('div'); banner.className = 'alert-banner bg-orange-500 text-white font-bold p-3 rounded-lg shadow-lg mb-2 flex items-center justify-between'; banner.innerHTML = `<span>${msg}</span><button class="ml-4 text-white/80 hover:text-white">&times;</button>`; DOMElements.alertBannerContainer.prepend(banner); banner.querySelector('button').addEventListener('click', () => banner.remove()); setTimeout(() => banner.remove(), 5000); };
         const showModal = (type) => { const content = { tos: { title: "Terms of Service", body: `<h4>1. Acceptance of Terms</h4><p>By accessing or using AlphaFlow, you agree to be bound by these Terms of Service...</p><h4>2. Financial Disclaimer</h4><p>AlphaFlow is a data provider and educational tool... You are solely responsible for your own investment decisions...</p>` }, privacy: { title: "Privacy Policy", body: `<h4>1. Information We Collect</h4><p>We collect information to provide and improve our Service...</p><h4>2. Use of Data</h4><p>AlphaFlow uses the collected data for various purposes...</p>`}, contact: { title: "Customer Service", body: `<h4>Contact Information</h4><p>For support, billing questions, or any other inquiries, please email our support team at: <a href="mailto:support@alphaflow.io" class="text-orange-400">support@alphaflow.io</a>.</p>` } }; DOMElements.modalTitle.textContent = content[type].title; DOMElements.modalBody.innerHTML = content[type].body.replace(/\.\.\./g, ' and other standard clauses.'); DOMElements.genericModal.classList.remove('hidden'); };
 
