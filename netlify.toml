@@ -1,10 +1,5 @@
 [build]
-
-This tells Netlify to publish the "index.html" it finds right there
-
 publish = "."
-
-This tells Netlify to find your functions in the root directory
-
 functions = "."
+
 
