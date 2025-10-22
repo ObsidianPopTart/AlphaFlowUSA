@@ -2,4 +2,8 @@
 publish = "."
 functions = "."
 
+[functions]
+node_bundler = "zisi"
+
+
 
