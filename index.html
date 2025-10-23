@@ -291,13 +291,21 @@
         import { getFirestore, doc, setDoc, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"; 
         
         // --- Configuration ---
-        // REMOVED hardcoded firebaseConfig
+        // **RESTORED** Hardcoded firebaseConfig
+        const firebaseConfig = {
+            apiKey: "AIzaSyDBQ0pvfmG9x3m8Da5Tsiekh6fermbKkQs",
+            authDomain: "alpha-flow-6c416.firebaseapp.com",
+            projectId: "alpha-flow-6c416",
+            storageBucket: "alpha-flow-6c416.appspot.com",
+            messagingSenderId: "1055894597563",
+            appId: "1:1055894597563:web:88c50b5907c4badc3b9e9e"
+        };
         const STRIPE_PUBLISHABLE_KEY = 'YOUR_STRIPE_PUBLISHABLE_KEY'; // REPLACE THIS
         const ADMIN_EMAIL = "travisclevenger.tc@gmail.com";
         const CRYPTO_LIMIT = 100; // Fetch Top 100 Cryptos
         const MAX_FLOW_ROWS = 150; // Max rows to keep in the main flow table
         const MAX_AFTERMARKET_ROWS = 50; // Max rows for aftermarket table
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // Get App ID
+        // **REMOVED** appId from global scope - not needed with hardcoded config
 
         // Secure Netlify Function Endpoints
         const CMC_PROXY_URL = '/.netlify/functions/crypto';
@@ -364,7 +372,8 @@
             if (dbUnsubscribe) dbUnsubscribe();
             
             // **Reverted Path:** Use the correct path structure (even segments)
-            const userDocPath = `artifacts/${appId}/users/${user.uid}`; 
+            // Use projectId from hardcoded config for the path
+            const userDocPath = `artifacts/${firebaseConfig.projectId}/users/${user.uid}`; 
             console.log(`Setting up listener for user data at: ${userDocPath}`); // Debug log
             const userRef = doc(db, userDocPath);
 
@@ -459,7 +468,7 @@
         // **Reverted Path:** Use the correct path structure (even segments)
         async function updateUserData(data) { 
             if (currentUser && db) { 
-                const userDocPath = `artifacts/${appId}/users/${currentUser.uid}`;
+                const userDocPath = `artifacts/${firebaseConfig.projectId}/users/${currentUser.uid}`;
                 console.log(`Updating user data at: ${userDocPath}`, data); // Debug log
                 try {
                     await setDoc(doc(db, userDocPath), data, { merge: true });
@@ -1404,64 +1413,7 @@
         const showModal = (type) => { const content = { tos: { title: "Terms of Service", body: `<h4>1. Acceptance of Terms</h4><p>By accessing or using AlphaFlow, you agree to be bound by these Terms of Service...</p><h4>2. Financial Disclaimer</h4><p>AlphaFlow is a data provider and educational tool... You are solely responsible for your own investment decisions...</p>` }, privacy: { title: "Privacy Policy", body: `<h4>1. Information We Collect</h4><p>We collect information to provide and improve our Service...</p><h4>2. Use of Data</h4><p>AlphaFlow uses the collected data for various purposes...</p>`}, contact: { title: "Customer Service", body: `<h4>Contact Information</h4><p>For support, billing questions, or any other inquiries, please email our support team at: <a href="mailto:support@alphaflow.io" class="text-orange-400">support@alphaflow.io</a>.</p>` } }; DOMElements.modalTitle.textContent = content[type].title; DOMElements.modalBody.innerHTML = content[type].body.replace(/\.\.\./g, ' and other standard clauses.'); DOMElements.genericModal.classList.remove('hidden'); };
 
         // --- App Initialization ---
-        async function initializeAppAndAuth() { // Wrap in async function
-             // Get config from global scope (provided by environment)
-             const firebaseConfigString = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-             if (!firebaseConfigString) {
-                 console.error("Firebase config is missing!");
-                 showInitializationError("Firebase configuration is missing. Cannot initialize application.");
-                 return;
-             }
-             const firebaseConfig = JSON.parse(firebaseConfigString);
-             
-             app = initializeApp(firebaseConfig);
-             auth = getAuth(app);
-             db = getFirestore(app);
-             setLogLevel('debug'); // Enable Firestore debug logging
-
-            // Get initial auth token and sign in
-             const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-             try {
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                    console.log("Signed in with custom token.");
-                } else {
-                    console.warn("No initial auth token found, signing in anonymously.");
-                    await signInAnonymously(auth);
-                }
-             } catch (error) {
-                 console.error("Firebase sign-in error:", error);
-                 showInitializationError(`Firebase sign-in failed: ${error.message}`);
-                 return; // Stop initialization if sign-in fails
-             }
-
-
-             // Safely initialize Stripe
-             if (STRIPE_PUBLISHABLE_KEY && STRIPE_PUBLISHABLE_KEY !== 'YOUR_STRIPE_PUBLISHABLE_KEY') {
-                 stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
-             } else {
-                 console.warn("Stripe key is a placeholder. Payment functionality will be disabled.");
-             }
-                
-             // Setup Listeners
-             setupAuthListeners(); 
-             setupEventListeners(); 
-             lucide.createIcons(); 
-                
-             // Auth State Change Listener (handles subsequent changes and initial load after sign-in)
-             onAuthStateChanged(auth, user => { 
-                 console.log("Auth state changed:", user ? user.uid : 'No user');
-                 authReady = true; 
-                 currentUser = user; 
-                 if (user) { 
-                     loadUserData(user); 
-                 } else { 
-                     handleSignedOutState(); 
-                 } 
-             });
-        }
-
-
+        // **RESTORED** Original initialization using hardcoded config
         document.addEventListener('DOMContentLoaded', () => {
             DOMElements = Object.fromEntries(Array.from(document.querySelectorAll('[id]')).map(el => [el.id.replace(/-(\w)/g, (m, g) => g.toUpperCase()), el]));
             // Add new DOM elements for aftermarket view
@@ -1470,10 +1422,41 @@
 
             DOMElements.pages = { dashboard: DOMElements.dashboardPage, plans: DOMElements.plansPage, account: DOMElements.accountPage, backtester: DOMElements.backtesterPage, chart: DOMElements.chartPage };
 
-            initializeAppAndAuth().catch(e => { // Call async init function
-                 console.error("Critical Initialization Error:", e);
-                 showInitializationError(`Failed to initialize application: ${e.message}`);
-            });
+            try {
+                // --- Initialize Firebase ---
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                setLogLevel('debug'); // Keep debug logging
+
+                // --- Safely initialize Stripe ---
+                if (STRIPE_PUBLISHABLE_KEY && STRIPE_PUBLISHABLE_KEY !== 'YOUR_STRIPE_PUBLISHABLE_KEY') {
+                    stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+                } else {
+                    console.warn("Stripe key is a placeholder. Payment functionality will be disabled.");
+                }
+                
+                // --- Setup Listeners ---
+                setupAuthListeners(); 
+                setupEventListeners(); 
+                lucide.createIcons(); 
+                
+                // **RESTORED** Original Auth State Listener
+                onAuthStateChanged(auth, user => { 
+                    console.log("Auth state changed (original listener):", user ? user.uid : 'No user');
+                    authReady = true; 
+                    currentUser = user; 
+                    if (user) { 
+                        loadUserData(user); 
+                    } else { 
+                        handleSignedOutState(); 
+                    } 
+                });
+
+            } catch(e) {
+                console.error("Critical Firebase Initialization Error:", e);
+                showInitializationError(`Failed to initialize Firebase: ${e.message}. Ensure your firebaseConfig object in index.html is correct.`);
+            }
         });
     </script>
 </body>
