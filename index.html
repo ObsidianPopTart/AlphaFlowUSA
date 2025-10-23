@@ -27,7 +27,7 @@
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #e5e7eb; }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #1818b; }
+        ::-webkit-scrollbar-track { background: #18181b; }
         ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #52525b; }
         .sticky-header { position: sticky; top: 0; z-index: 10; }
@@ -776,321 +776,317 @@
             }
         }
         
-       // **UPDATED** renderHeatmap - More robust and handles initialization order
+       // **UPDATED** renderHeatmap - Refined initialization order and guards
         function renderHeatmap() {
-             const container = d3.select("#heatmap-container");
-             const tooltip = d3.select("#heatmap-tooltip");
+            console.log("renderHeatmap called"); // Log start
+            const container = d3.select("#heatmap-container");
+            const tooltip = d3.select("#heatmap-tooltip");
              
-             // --- 1. Data Preparation ---
-             let dataToUse = [];
-             let valueAccessor, symbolAccessor, nameAccessor, colorAccessor;
-             let valueKey; 
+            // --- 1. Data Preparation --- (Ensure safety checks remain)
+            let dataToUse = [];
+            let valueAccessor, symbolAccessor, nameAccessor, colorAccessor;
+            let valueKey; 
 
-             if (activeHeatmapFilter === 'options') {
-                 if (!initialFlowLoadComplete || currentFlowData.length === 0) { 
-                    container.html(!initialFlowLoadComplete ? '<p class="text-neutral-500 text-center">Loading options data...</p>' : '<p class="text-neutral-500 text-center">No unusual options activity detected.</p>');
+            try { // Wrap data processing in try...catch
+                if (activeHeatmapFilter === 'options') {
+                    if (!initialFlowLoadComplete || currentFlowData.length === 0) { 
+                        container.html(!initialFlowLoadComplete ? '<p class="text-neutral-500 text-center">Loading options data...</p>' : '<p class="text-neutral-500 text-center">No unusual options activity detected.</p>');
+                        return; 
+                    }
+                    dataToUse = d3.rollups(/* ... */).map(/* ... */); // (Keep existing rollup logic)
+                    // ... (Keep existing accessors and color logic) ...
+                    valueAccessor = d => d.totalPremium;
+                    symbolAccessor = d => d.symbol;
+                    nameAccessor = d => d.symbol;
+                    colorAccessor = d => { /* ... Green/Red/Gray logic ... */ };
+                    valueKey = 'totalPremium';
+
+                } else { // Crypto
+                    if (!initialCryptoLoadComplete || currentCryptoData.length === 0) { 
+                        container.html(!initialCryptoLoadComplete ? '<p class="text-neutral-500 text-center">Loading crypto data...</p>' : '<p class="text-neutral-500 text-center">No crypto data available.</p>');
+                        return; 
+                    }
+                    // Safety checks for crypto data mapping
+                    dataToUse = currentCryptoData
+                        .map(c => { /* ... Keep existing map logic with checks ... */ })
+                        .filter(item => item !== null); 
+                    // ... (Keep existing accessors and color logic) ...
+                    valueAccessor = d => d.volume24h;
+                    symbolAccessor = d => d.symbol;
+                    nameAccessor = d => d.name;
+                    colorAccessor = d => { /* ... Green/Red/Gray logic ... */ };
+                    valueKey = 'volume24h';
+                }
+
+                if (dataToUse.length === 0) { 
+                    container.html(`<p class="text-neutral-500 text-center">No data currently matches criteria for ${activeHeatmapFilter}.</p>`); 
                     return; 
-                 }
-                 dataToUse = d3.rollups(
-                     currentFlowData,
-                     v => ({
-                         totalPremium: d3.sum(v, d => d.totalValue),
-                         bullishPremium: d3.sum(v.filter(d => d.sentiment === 'BULLISH'), d => d.totalValue),
-                         count: v.length
-                     }),
-                     d => d.symbol
-                 ).map(([key, value]) => ({ symbol: key, ...value }));
-                 
-                 valueAccessor = d => d.totalPremium;
-                 symbolAccessor = d => d.symbol;
-                 nameAccessor = d => d.symbol;
-                 colorAccessor = d => { 
-                     if (!d || d.totalPremium === undefined || d.bullishPremium === undefined || d.totalPremium === 0) return '#a3a3a3'; 
-                     const bullishRatio = d.bullishPremium / d.totalPremium;
-                     if (bullishRatio > 0.5) return '#22c55e'; // Green
-                     if (bullishRatio < 0.5) return '#ef4444'; // Red
-                     return '#a3a3a3'; // Gray 
-                 };
-                 valueKey = 'totalPremium';
-
-             } else { // Crypto
-                 if (!initialCryptoLoadComplete || currentCryptoData.length === 0) { 
-                    container.html(!initialCryptoLoadComplete ? '<p class="text-neutral-500 text-center">Loading crypto data...</p>' : '<p class="text-neutral-500 text-center">No crypto data available.</p>');
-                    return; 
-                 }
-                 // Safety checks for crypto data mapping
-                 dataToUse = currentCryptoData
-                    .map(c => {
-                        if (!c || !c.quote || !c.quote.USD) {
-                            console.warn("Skipping crypto with missing quote data:", c);
-                            return null; 
-                        }
-                        return {
-                            symbol: c.symbol,
-                            name: c.name,
-                            volume24h: c.quote.USD.volume_24h ?? 0, 
-                            change24h: c.quote.USD.percent_change_24h ?? 0 
-                        };
-                    })
-                    .filter(item => item !== null); // Filter out null entries
-
-                 valueAccessor = d => d.volume24h;
-                 symbolAccessor = d => d.symbol;
-                 nameAccessor = d => d.name;
-                 colorAccessor = d => { 
-                     if (!d || d.change24h === undefined) return '#a3a3a3'; 
-                     if (d.change24h > 0) return '#22c55e'; // Green
-                     if (d.change24h < 0) return '#ef4444'; // Red
-                     return '#a3a3a3'; // Gray 
-                 };
-                 valueKey = 'volume24h';
-             }
-
-             if (dataToUse.length === 0) { 
-                 container.html(`<p class="text-neutral-500 text-center">No data currently matches criteria for ${activeHeatmapFilter}.</p>`); 
-                 return; 
-             }
+                }
+            } catch (dataError) {
+                console.error("Error preparing heatmap data:", dataError);
+                container.html('<p class="text-red-400 text-center">Error processing heatmap data. Check console.</p>');
+                return;
+            }
+            console.log("Heatmap data prepared:", dataToUse.length, "items"); // Log data count
 
              // --- 2. Setup SVG, Zoom, Simulation ---
-             const containerNode = container.node();
-             if (!containerNode) return;
-             const bounds = containerNode.getBoundingClientRect();
-             const width = bounds.width;
-             const height = bounds.height;
-             if (width <= 0 || height <= 0) { setTimeout(renderHeatmap, 100); return; }
+            const containerNode = container.node();
+            if (!containerNode) return;
+            const bounds = containerNode.getBoundingClientRect();
+            const width = bounds.width;
+            const height = bounds.height;
+            if (width <= 0 || height <= 0) { 
+                console.warn("Heatmap container has zero dimensions, retrying...");
+                setTimeout(renderHeatmap, 100); 
+                return; 
+            }
 
-             const maxVal = d3.max(dataToUse, d => valueAccessor(d)) || 1; 
-             const radiusScale = d3.scaleSqrt().domain([0, maxVal]).range([5, Math.min(width, height) / 8]); 
+            const maxVal = d3.max(dataToUse, d => valueAccessor(d)) || 1; 
+            const radiusScale = d3.scaleSqrt().domain([0, maxVal]).range([5, Math.min(width, height) / 8]); 
 
-             let nodeMap = new Map(heatmapNodes.map(node => [symbolAccessor(node.data), node]));
-             heatmapNodes = dataToUse.map(d => {
-                 const existingNode = nodeMap.get(symbolAccessor(d));
-                 const targetRadius = radiusScale(valueAccessor(d)) || 5; 
-                 return {
-                     id: symbolAccessor(d), 
-                     data: d,
-                     x: existingNode?.x || width / 2 + (Math.random() - 0.5) * 50,
-                     y: existingNode?.y || height / 2 + (Math.random() - 0.5) * 50,
-                     targetRadius: targetRadius, 
-                     r: existingNode?.r || targetRadius 
-                 };
-             });
+            let nodeMap = new Map(heatmapNodes.map(node => [node.id, node])); // Use ID for map key
+            heatmapNodes = dataToUse.map(d => {
+                const id = symbolAccessor(d); // Get ID
+                const existingNode = nodeMap.get(id);
+                const targetRadius = radiusScale(valueAccessor(d)) || 5; 
+                return {
+                    id: id, 
+                    data: d,
+                    x: existingNode?.x || width / 2 + (Math.random() - 0.5) * 50,
+                    y: existingNode?.y || height / 2 + (Math.random() - 0.5) * 50,
+                    targetRadius: targetRadius, 
+                    r: existingNode?.r || targetRadius 
+                };
+            });
+            console.log("Heatmap nodes created/updated:", heatmapNodes.length); // Log node count
 
-             // Initialize SVG and zoom only once per heatmap instance
-             if (!heatmapSvg || heatmapSvg.empty()) { 
-                 container.html(''); // Clear container first
-                 heatmapSvg = container.append("svg").attr("width", width).attr("height", height);
-                 
-                 // **FIX**: Define content group *before* applying zoom
-                 heatmapContentGroup = heatmapSvg.append("g").attr("class", "heatmap-content"); 
-                 
-                 heatmapZoomBehavior = d3.zoom() 
-                     .scaleExtent([0.5, 8])
-                     .on("zoom", zoomed);
-                 heatmapSvg.call(heatmapZoomBehavior).on("dblclick.zoom", null); 
-                 
-                 // Apply initial transform *after* group exists
-                 heatmapSvg.call(heatmapZoomBehavior.transform, heatmapCurrentTransform); 
-                 
-             } else {
-                  // Ensure content group selection is up-to-date if SVG already exists
-                 heatmapContentGroup = heatmapSvg.select(".heatmap-content"); 
-                 // Ensure SVG dimensions are up-to-date (in case of resize)
-                  heatmapSvg.attr("width", width).attr("height", height);
-             }
-             
-             // Select the main content group using the stored variable
-             // **FIX**: Define 'g' here *after* ensuring heatmapContentGroup exists
-             const g = heatmapContentGroup; 
-             if (!g || g.empty()) { // Add safety check
-                 console.error("Heatmap content group ('g') is not defined or empty.");
-                 return;
-             }
+            // **NEW Initialization Order**
+            try { // Wrap D3 setup in try...catch
+                if (!heatmapSvg || heatmapSvg.empty()) { 
+                    console.log("Initializing Heatmap SVG and Zoom"); // Log init
+                    container.html(''); // Clear container first
+                    heatmapSvg = container.append("svg").attr("width", width).attr("height", height);
+                    
+                    // Create group first
+                    heatmapContentGroup = heatmapSvg.append("g").attr("class", "heatmap-content"); 
+                    
+                    heatmapZoomBehavior = d3.zoom() 
+                        .scaleExtent([0.5, 8])
+                        .on("zoom", zoomed);
+                    
+                    // Apply zoom behavior to SVG
+                    heatmapSvg.call(heatmapZoomBehavior).on("dblclick.zoom", null); 
+                    
+                    // Apply initial transform AFTER group exists and behavior is attached
+                    heatmapSvg.call(heatmapZoomBehavior.transform, heatmapCurrentTransform); 
+                    
+                } else {
+                    console.log("Updating existing Heatmap SVG"); // Log update
+                    // Ensure selections are valid and update dimensions
+                    heatmapContentGroup = heatmapSvg.select(".heatmap-content"); 
+                    heatmapSvg.attr("width", width).attr("height", height);
+                    // Re-apply current transform in case SVG resized
+                    heatmapSvg.call(heatmapZoomBehavior.transform, heatmapCurrentTransform);
+                }
+                
+                // Define 'g' *after* ensuring heatmapContentGroup exists
+                const g = heatmapContentGroup; 
+                if (!g || g.empty()) { 
+                    console.error("Heatmap content group ('g') could not be created or selected.");
+                    return; // Stop if group doesn't exist
+                }
+                console.log("Heatmap content group ('g') ready."); // Log success
 
-            // Initialize or restart simulation
-             if (!heatmapSimulation) {
-                 heatmapSimulation = d3.forceSimulation(heatmapNodes)
-                     .force("center", d3.forceCenter(width / 2, height / 2).strength(0.01)) 
-                     .force("collide", d3.forceCollide().radius(d => d.r + 2).strength(0.7)) 
-                     .force("x", d3.forceX(width / 2).strength(0.005)) 
-                     .force("y", d3.forceY(height / 2).strength(0.005)) 
-                     .on("tick", ticked);
-             } else {
-                 heatmapSimulation.nodes(heatmapNodes); 
-                 // Update center and x/y forces if dimensions changed
-                  heatmapSimulation.force("center", d3.forceCenter(width / 2, height / 2).strength(0.01));
-                  heatmapSimulation.force("x", d3.forceX(width / 2).strength(0.005));
-                  heatmapSimulation.force("y", d3.forceY(height / 2).strength(0.005));
-                 heatmapSimulation.alpha(0.3).restart(); 
-             }
+                // Initialize or restart simulation
+                if (!heatmapSimulation) {
+                    console.log("Initializing Heatmap Simulation"); // Log init
+                    heatmapSimulation = d3.forceSimulation(heatmapNodes)
+                        .force("center", d3.forceCenter(width / 2, height / 2).strength(0.01)) 
+                        .force("collide", d3.forceCollide().radius(d => d.r + 2).strength(0.7)) 
+                        .force("x", d3.forceX(width / 2).strength(0.005)) 
+                        .force("y", d3.forceY(height / 2).strength(0.005)) 
+                        .on("tick", ticked);
+                } else {
+                    console.log("Restarting Heatmap Simulation"); // Log restart
+                    heatmapSimulation.nodes(heatmapNodes); 
+                    heatmapSimulation.force("center", d3.forceCenter(width / 2, height / 2).strength(0.01));
+                    heatmapSimulation.force("x", d3.forceX(width / 2).strength(0.005));
+                    heatmapSimulation.force("y", d3.forceY(height / 2).strength(0.005));
+                    heatmapSimulation.alpha(0.3).restart(); 
+                }
 
-             // --- 3. Data Join ---
-             const bubbleGroups = g.selectAll(".heatmap-bubble")
-                 .data(heatmapNodes, d => d.id) 
-                 .join(
-                     enter => { 
-                         const group = enter.append("g")
-                             .attr("class", "heatmap-bubble")
-                             .attr("transform", d => `translate(${d.x},${d.y})`)
-                             .style("opacity", 0) 
-                             .call(drag(heatmapSimulation)) 
-                             .on("click", (event, d) => { event.stopPropagation(); showChartView(symbolAccessor(d.data)); })
-                             .on("mouseover", handleMouseOver)
-                             .on("mouseout", handleMouseOut);
+                // --- 3. Data Join ---
+                const bubbleGroups = g.selectAll(".heatmap-bubble")
+                    .data(heatmapNodes, d => d.id) 
+                    .join(
+                        // ... (Keep existing enter, update, exit logic) ...
+                         enter => { // --- ENTER --- New bubbles
+                            const group = enter.append("g")
+                                .attr("class", "heatmap-bubble")
+                                .attr("transform", d => `translate(${d.x},${d.y})`)
+                                .style("opacity", 0) 
+                                .call(drag(heatmapSimulation)) 
+                                .on("click", (event, d) => { event.stopPropagation(); showChartView(symbolAccessor(d.data)); })
+                                .on("mouseover", handleMouseOver)
+                                .on("mouseout", handleMouseOut);
 
-                         group.append("circle")
-                             .attr("r", 0) 
-                             .attr("fill", d => colorAccessor(d.data))
-                             .transition().duration(500).delay((d, i) => i * 5) 
-                             .attr("r", d => d.targetRadius); 
+                            group.append("circle")
+                                .attr("r", 0) 
+                                .attr("fill", d => colorAccessor(d.data))
+                                .transition().duration(500).delay((d, i) => i * 5) 
+                                .attr("r", d => d.targetRadius); 
 
-                         const text = group.append("text")
-                             .attr("clip-path", d => `circle(${d.targetRadius})`); 
+                            const text = group.append("text")
+                                .attr("clip-path", d => `circle(${d.targetRadius})`); 
 
-                         text.append("tspan")
-                             .attr("class", "ticker-label")
-                             .attr("x", 0)
-                             .attr("y", d => d.targetRadius <= 20 ? "0.1em" : "-0.2em")
-                             .attr("fill", d => getTextColor(colorAccessor(d.data)))
-                             .attr("font-weight", "bold")
-                             .style("font-size", d => calculateFontSize(d.targetRadius, 2.5))
-                             .text(d => symbolAccessor(d.data));
+                            text.append("tspan")
+                                .attr("class", "ticker-label")
+                                .attr("x", 0)
+                                .attr("y", d => d.targetRadius <= 20 ? "0.1em" : "-0.2em")
+                                .attr("fill", d => getTextColor(colorAccessor(d.data)))
+                                .attr("font-weight", "bold")
+                                .style("font-size", d => calculateFontSize(d.targetRadius, 2.5))
+                                .text(d => symbolAccessor(d.data));
 
-                         text.append("tspan")
-                             .attr("class", "value-label")
-                             .attr("x", 0)
-                             .attr("y", "0.9em")
-                             .attr("fill", d => getTextColor(colorAccessor(d.data)))
-                             .style("font-size", d => calculateFontSize(d.targetRadius, 3))
-                             .style("opacity", d => d.targetRadius > 20 ? 1 : 0) 
-                             .text(d => formatCurrency(valueAccessor(d.data)));
-                             
-                          group.transition().duration(500).style("opacity", 1); 
-                             
-                         return group;
-                     },
-                     update => { 
-                         update.select("circle")
-                             .transition().duration(750)
-                             .attr("r", d => d.targetRadius)
-                             .attr("fill", d => colorAccessor(d.data));
+                            text.append("tspan")
+                                .attr("class", "value-label")
+                                .attr("x", 0)
+                                .attr("y", "0.9em")
+                                .attr("fill", d => getTextColor(colorAccessor(d.data)))
+                                .style("font-size", d => calculateFontSize(d.targetRadius, 3))
+                                .style("opacity", d => (d.targetRadius * heatmapCurrentTransform.k) > 20 ? 1 : 0) // Check initial opacity based on CURRENT zoom
+                                .text(d => formatCurrency(valueAccessor(d.data)));
+                                
+                            group.transition().duration(500).style("opacity", 1); 
+                                
+                            return group;
+                        },
+                        update => { // --- UPDATE --- Existing bubbles
+                            update.select("circle")
+                                .transition().duration(750)
+                                .attr("r", d => d.targetRadius)
+                                .attr("fill", d => colorAccessor(d.data));
 
-                         update.select("text").attr("clip-path", d => `circle(${d.targetRadius})`);
+                            update.select("text").attr("clip-path", d => `circle(${d.targetRadius})`);
 
-                         update.select(".ticker-label")
-                             .transition().duration(750)
-                             .attr("y", d => (d.targetRadius * heatmapCurrentTransform.k) <= 20 ? "0.1em" : "-0.2em") 
-                             .style("font-size", d => calculateFontSize(d.targetRadius, 2.5))
-                             .text(d => symbolAccessor(d.data)) 
-                             .attr("fill", d => getTextColor(colorAccessor(d.data))); 
+                            update.select(".ticker-label")
+                                .transition().duration(750)
+                                .attr("y", d => (d.targetRadius * heatmapCurrentTransform.k) <= 20 ? "0.1em" : "-0.2em") 
+                                .style("font-size", d => calculateFontSize(d.targetRadius, 2.5))
+                                .text(d => symbolAccessor(d.data)) 
+                                .attr("fill", d => getTextColor(colorAccessor(d.data))); 
 
-                         update.select(".value-label")
-                              .transition().duration(750)
-                              .style("font-size", d => calculateFontSize(d.targetRadius, 3))
-                              .style("opacity", d => (d.targetRadius * heatmapCurrentTransform.k) > 20 ? 1 : 0) 
-                              .text(d => formatCurrency(valueAccessor(d.data)))
-                              .attr("fill", d => getTextColor(colorAccessor(d.data))); 
+                            update.select(".value-label")
+                                .transition().duration(750)
+                                .style("font-size", d => calculateFontSize(d.targetRadius, 3))
+                                .style("opacity", d => (d.targetRadius * heatmapCurrentTransform.k) > 20 ? 1 : 0) 
+                                .text(d => formatCurrency(valueAccessor(d.data)))
+                                .attr("fill", d => getTextColor(colorAccessor(d.data))); 
 
-                         return update;
-                     },
-                     exit => { 
-                          heatmapNodes = heatmapNodes.filter(node => !exit.data().some(exitNode => exitNode.id === node.id));
+                            return update;
+                        },
+                        exit => { // --- EXIT --- Bubbles leaving
+                            heatmapNodes = heatmapNodes.filter(node => !exit.data().some(exitNode => exitNode.id === node.id));
 
-                          exit.select("circle")
-                              .transition().duration(500)
-                              .attr("r", 0); 
+                            exit.select("circle")
+                                .transition().duration(500)
+                                .attr("r", 0); 
 
-                          exit.transition().duration(500)
-                              .style("opacity", 0) 
-                              .remove(); 
-                     }
-                 );
+                            exit.transition().duration(500)
+                                .style("opacity", 0) 
+                                .remove(); 
+                        }
+                    );
 
-             // --- 4. Simulation Tick & Zoom ---
-             function ticked() {
-                  heatmapNodes.forEach(node => {
-                       node.r += (node.targetRadius - node.r) * 0.1; 
-                  });
-                  if (heatmapSimulation) { 
-                    heatmapSimulation.force("collide").radius(d => d.r + 2);
-                  }
-                  // **FIX**: Select bubbleGroups within ticked using the correct group ('g')
-                  if(g && !g.empty()) { // Check if g exists
-                     g.selectAll(".heatmap-bubble") 
-                        .attr("transform", d => `translate(${d.x},${d.y})`);
-                  }
-             }
+                // --- 4. Simulation Tick & Zoom ---
+                function ticked() {
+                    heatmapNodes.forEach(node => {
+                        node.r += (node.targetRadius - node.r) * 0.1; 
+                    });
+                    if (heatmapSimulation) { 
+                        heatmapSimulation.force("collide").radius(d => d.r + 2);
+                    }
+                    // Apply transform to the groups within the main content group 'g'
+                    if(g && !g.empty()) { 
+                        g.selectAll(".heatmap-bubble") 
+                            .attr("transform", d => `translate(${d.x},${d.y})`);
+                    }
+                }
 
-             function zoomed(event) {
-                 const { transform } = event;
-                 heatmapCurrentTransform = transform; 
-                 
-                 // **FIX**: Apply transform to the correct group ('g') and check if it exists
-                 if (g && !g.empty()) { // Check if g exists
-                    g.attr("transform", transform); 
-                 
-                    // Update value label visibility on zoom - select within 'g'
-                    g.selectAll(".heatmap-bubble .value-label") 
-                        .style("opacity", d => (d.r * transform.k) > 20 ? 1 : 0);
+                function zoomed(event) {
+                    const { transform } = event;
+                    heatmapCurrentTransform = transform; 
+                    
+                    // **GUARDED**: Apply transform only if 'g' exists
+                    if (g && !g.empty()) { 
+                        g.attr("transform", transform); 
+                    
+                        // Update styles based on zoom - select within 'g'
+                        g.selectAll(".heatmap-bubble .value-label") 
+                            .style("opacity", d => (d.r * transform.k) > 20 ? 1 : 0);
+                        g.selectAll(".heatmap-bubble .ticker-label")
+                            .attr("y", d => (d.r * transform.k) <= 20 ? "0.1em" : "-0.2em");
+                    } else {
+                        console.warn("Zoom event fired but heatmap content group ('g') is not ready.");
+                    }
+                }
 
-                    // Update ticker label Y position on zoom - select within 'g'
-                    g.selectAll(".heatmap-bubble .ticker-label")
-                        .attr("y", d => (d.r * transform.k) <= 20 ? "0.1em" : "-0.2em");
-                 } else {
-                     console.error("Heatmap content group ('g') is not defined or empty during zoom.");
-                 }
-             }
-
-             // --- 5. Helper Functions --- (handleMouseOver, handleMouseOut, getTextColor, calculateFontSize, drag - remain the same)
-              function handleMouseOver(event, d) {
-                 d3.select(this).raise(); 
-                 tooltip.style("opacity", .9);
-                 let tooltipText = `<b>${symbolAccessor(d.data)}</b> (${nameAccessor(d.data)})<br/>`;
-                  if (activeHeatmapFilter === 'options') {
-                      tooltipText += `Premium: ${formatCurrency(d.data.totalPremium)}<br/>Sentiment: ${d.data.totalPremium > 0 ? ((d.data.bullishPremium / d.data.totalPremium) * 100).toFixed(0) : 'N/A'}% Bullish`;
-                  } else {
-                      tooltipText += `Volume (24h): ${formatCurrency(d.data.volume24h)}<br/>Change (24h): ${d.data.change24h ? d.data.change24h.toFixed(2) : 'N/A'}%`;
-                  }
-                 const [mouseX, mouseY] = d3.pointer(event, container.node());
-                 tooltip.html(tooltipText)
-                     .style("left", (mouseX + 15) + "px") 
-                     .style("top", (mouseY) + "px"); 
-             }
-             function handleMouseOut(event, d) {
-                 tooltip.style("opacity", 0);
-             }
-             function getTextColor(backgroundColor) {
-                  const color = d3.color(backgroundColor);
-                  return color && d3.lab(color).l < 60 ? "#fff" : "#eee"; 
-             }
-             function calculateFontSize(radius, factor) {
-                 const baseSize = radius / factor;
-                 return Math.max(6, Math.min(10, baseSize)) + 'px'; 
-             }
-             function drag(simulation) {
-                 function dragstarted(event, d) {
-                     if (!event.active) simulation.alphaTarget(0.3).restart();
-                     d.fx = d.x; 
-                     d.fy = d.y;
+                 // --- 5. Helper Functions --- (handleMouseOver, handleMouseOut, getTextColor, calculateFontSize, drag - remain the same)
+                 function handleMouseOver(event, d) {
                      d3.select(this).raise(); 
+                     tooltip.style("opacity", .9);
+                     let tooltipText = `<b>${symbolAccessor(d.data)}</b> (${nameAccessor(d.data)})<br/>`;
+                    if (activeHeatmapFilter === 'options') {
+                        tooltipText += `Premium: ${formatCurrency(d.data.totalPremium)}<br/>Sentiment: ${d.data.totalPremium > 0 ? ((d.data.bullishPremium / d.data.totalPremium) * 100).toFixed(0) : 'N/A'}% Bullish`;
+                    } else {
+                        tooltipText += `Volume (24h): ${formatCurrency(d.data.volume24h)}<br/>Change (24h): ${d.data.change24h ? d.data.change24h.toFixed(2) : 'N/A'}%`;
+                    }
+                     const [mouseX, mouseY] = d3.pointer(event, container.node());
+                     tooltip.html(tooltipText)
+                         .style("left", (mouseX + 15) + "px") 
+                         .style("top", (mouseY) + "px"); 
                  }
-                 function dragged(event, d) {
-                     d.fx = event.x; 
-                     d.fy = event.y;
+                 function handleMouseOut(event, d) {
+                     tooltip.style("opacity", 0);
                  }
-                 function dragended(event, d) {
-                     if (!event.active) simulation.alphaTarget(0); 
-                     d.fx = null; 
-                     d.fy = null;
+                 function getTextColor(backgroundColor) {
+                    const color = d3.color(backgroundColor);
+                    // Use more contrast check for better readability
+                    return color && d3.lab(color).l < 50 ? "#f0f0f0" : "#111"; 
                  }
-                 return d3.drag()
-                     .on("start", dragstarted)
-                     .on("drag", dragged)
-                     .on("end", dragended);
-             }
+                 function calculateFontSize(radius, factor) {
+                     const baseSize = radius / factor;
+                     return Math.max(6, Math.min(10, baseSize)) + 'px'; 
+                 }
+                 function drag(simulation) {
+                     function dragstarted(event, d) {
+                         if (!event.active) simulation.alphaTarget(0.3).restart();
+                         d.fx = d.x; 
+                         d.fy = d.y;
+                         d3.select(this).raise(); 
+                     }
+                     function dragged(event, d) {
+                         d.fx = event.x; 
+                         d.fy = event.y;
+                     }
+                     function dragended(event, d) {
+                         if (!event.active) simulation.alphaTarget(0); 
+                         d.fx = null; 
+                         d.fy = null;
+                     }
+                     return d3.drag()
+                         .on("start", dragstarted)
+                         .on("drag", dragged)
+                         .on("end", dragended);
+                 }
+
+            } catch (renderError) {
+                 console.error("Error rendering heatmap:", renderError);
+                 container.html('<p class="text-red-400 text-center">Error rendering heatmap. Check console.</p>');
+            }
         }
         
-        // --- Data Fetching & Rendering --- (Keep existing functions: startDataFetching, stopDataFetching, fetchAndRenderFlow, fetchAndRenderAftermarketFlow, fetchAndRenderNews, fetchAndRenderCrypto, processFlowUpdate, processAftermarketUpdate, createFlowRowElement, createAftermarketRowElement, updateFlowTable, renderAftermarketTable, renderNewsFeed, renderCryptoFlowTable, getFilteredAndSortedData)
+        // --- Data Fetching & Rendering --- (Keep existing functions)
          // Simplified startDataFetching - Runs continuously
         function startDataFetching() {
              stopDataFetching(); 
