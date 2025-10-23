@@ -363,8 +363,7 @@
         function loadUserData(user) {
             if (dbUnsubscribe) dbUnsubscribe();
             
-            // **Corrected Path:** Use an even number of segments for the document path
-            // Structure: /artifacts/{appId}/users/{userId}
+            // **Reverted Path:** Use the correct path structure (even segments)
             const userDocPath = `artifacts/${appId}/users/${user.uid}`; 
             console.log(`Setting up listener for user data at: ${userDocPath}`); // Debug log
             const userRef = doc(db, userDocPath);
@@ -457,7 +456,7 @@
             }
         }
         
-        // **Corrected Path:** Use an even number of segments for the document path
+        // **Reverted Path:** Use the correct path structure (even segments)
         async function updateUserData(data) { 
             if (currentUser && db) { 
                 const userDocPath = `artifacts/${appId}/users/${currentUser.uid}`;
@@ -785,13 +784,23 @@
              
              const svg = container.append("svg").attr("width", width).attr("height", height).attr("font-size", 10).attr("text-anchor", "middle");
 
+              // **NEW** Zoom Behavior
+             const zoom = d3.zoom()
+                 .scaleExtent([0.5, 8]) // Min/max zoom levels
+                 .on("zoom", zoomed);
+
+             svg.call(zoom); // Apply zoom behavior to the SVG
+
+             const g = svg.append("g"); // Group for zoomable elements
+
+
              // Tooltip
              const tooltip = d3.select("body").append("div") // Append to body to avoid clipping
                 .style("opacity", 0)
                 .attr("class", "absolute bg-neutral-900 border border-neutral-700 rounded-md p-2 text-xs shadow-lg pointer-events-none z-[70]"); // Ensure high z-index
 
 
-             const g = svg.selectAll("g")
+             const bubbles = g.selectAll(".heatmap-bubble") // Select groups within the zoomable group
                  .data(root.leaves())
                  .enter().append("g")
                  .attr("class", "heatmap-bubble")
@@ -813,35 +822,58 @@
                      tooltip.transition().duration(500).style("opacity", 0);
                  });
 
-             g.append("circle")
+             bubbles.append("circle")
                  .attr("r", d => d.r)
                  .attr("fill", d => colorAccessor(d.data)) // Use the unified colorAccessor
                  .attr("stroke", "#4a4a4a")
                  .attr("stroke-width", 1.5);
 
-            // Adjust text based on data type and bubble size
-            g.append("text")
-                 .attr("clip-path", d => `circle(${d.r})`) // Prevent text overflow
-                 .selectAll("tspan")
-                 .data(d => {
-                     const lines = [symbolAccessor(d.data)];
-                     // Add value only if bubble is large enough
-                     if (d.r > 20) { 
-                         lines.push(formatCurrency(valueAccessor(d.data)));
-                     }
-                     return lines;
-                 })
-                 .enter().append("tspan")
+            // Text Elements (Ticker always visible, Value visibility depends on zoom)
+            const textGroups = bubbles.append("text")
+                 .attr("clip-path", d => `circle(${d.r})`); // Prevent text overflow
+
+            // Ticker (Always add)
+             textGroups.append("tspan")
+                 .attr("class", "ticker-label")
                  .attr("x", 0)
-                 .attr("y", (d, i, nodes) => `${i - nodes.length / 2 + 0.8}em`) // Center text vertically
-                 .attr("fill", d => { // Adjust text color for contrast (simple light/dark check)
+                 .attr("y", d => d.r > 15 ? "-0.2em" : "0.3em") // Adjust position based on whether value is likely shown
+                 .attr("fill", d => { 
                       const color = d3.color(colorAccessor(d.data));
-                      // Use white text for dark backgrounds (like red/green) and dark text for light (like gray if it was lighter)
-                      return color && d3.lab(color).l < 60 ? "#fff" : "#eee"; // Prefer light text on colored backgrounds
+                      return color && d3.lab(color).l < 60 ? "#fff" : "#eee"; 
                  })
-                 .attr("font-weight", (d,i) => i === 0 ? "bold" : "normal")
-                 .style("font-size", d => d.r < 15 ? '8px' : '10px') // Smaller font for smaller bubbles
-                 .text(d => d);
+                 .attr("font-weight", "bold")
+                 .style("font-size", d => Math.max(6, Math.min(10, d.r / 2.5)) + 'px') // Dynamic font size based on radius
+                 .text(d => symbolAccessor(d.data));
+
+            // Value (Add but maybe hide initially)
+             textGroups.append("tspan")
+                 .attr("class", "value-label")
+                 .attr("x", 0)
+                 .attr("y", "0.9em") // Position below ticker
+                 .attr("fill", d => { 
+                      const color = d3.color(colorAccessor(d.data));
+                      return color && d3.lab(color).l < 60 ? "#fff" : "#eee"; 
+                 })
+                 .style("font-size", d => Math.max(5, Math.min(9, d.r / 3)) + 'px') // Slightly smaller font size
+                 .style("opacity", d => d.r > 20 ? 1 : 0) // Hide initially if small
+                 .text(d => formatCurrency(valueAccessor(d.data)));
+                 
+             // **NEW** Zoomed function
+             function zoomed(event) {
+                 const { transform } = event;
+                 g.attr("transform", transform); // Apply zoom transform to the group
+
+                 // Update value label visibility based on apparent size
+                 bubbles.selectAll(".value-label")
+                     .style("opacity", d => (d.r * transform.k) > 20 ? 1 : 0); // Show if apparent radius > 20px
+
+                  // Optional: Adjust font size slightly on zoom? (Can impact performance)
+                 // bubbles.selectAll(".ticker-label")
+                 //     .style("font-size", d => Math.max(6, Math.min(10, (d.r * transform.k) / 2.5)) + 'px');
+                 // bubbles.selectAll(".value-label")
+                 //     .style("font-size", d => Math.max(5, Math.min(9, (d.r * transform.k) / 3)) + 'px');
+             }
+
          }
         
         // --- Data Fetching & Rendering ---
