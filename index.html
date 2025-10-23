@@ -370,6 +370,7 @@
         let heatmapZoomBehavior = null; // Store zoom behavior instance (renamed)
         let heatmapCurrentTransform = d3.zoomIdentity; // Store current transform
         let heatmapNodes = []; // Store current nodes being simulated
+        let heatmapContentGroup = null; // **NEW**: Store the main content group selection
 
         // --- Error Handling for Initialization ---
         function showInitializationError(message) {
@@ -489,6 +490,7 @@
                  heatmapSimulation = null;
              }
              heatmapSvg = null; // Clear SVG selection on sign out
+             heatmapContentGroup = null; // Clear content group selection
              heatmapZoomBehavior = null; // Clear zoom behavior
              heatmapCurrentTransform = d3.zoomIdentity; // Reset transform
              heatmapNodes = []; // Clear nodes
@@ -774,7 +776,7 @@
             }
         }
         
-        // **NEW** renderHeatmap using force simulation and data joins
+       // **UPDATED** renderHeatmap - More robust and handles initialization order
         function renderHeatmap() {
              const container = d3.select("#heatmap-container");
              const tooltip = d3.select("#heatmap-tooltip");
@@ -782,7 +784,7 @@
              // --- 1. Data Preparation ---
              let dataToUse = [];
              let valueAccessor, symbolAccessor, nameAccessor, colorAccessor;
-             let valueKey; // To calculate radius scale domain
+             let valueKey; 
 
              if (activeHeatmapFilter === 'options') {
                  if (!initialFlowLoadComplete || currentFlowData.length === 0) { 
@@ -816,7 +818,7 @@
                     container.html(!initialCryptoLoadComplete ? '<p class="text-neutral-500 text-center">Loading crypto data...</p>' : '<p class="text-neutral-500 text-center">No crypto data available.</p>');
                     return; 
                  }
-                 // **FIXED** Add safety checks for crypto data mapping
+                 // Safety checks for crypto data mapping
                  dataToUse = currentCryptoData
                     .map(c => {
                         if (!c || !c.quote || !c.quote.USD) {
@@ -844,7 +846,6 @@
                  valueKey = 'volume24h';
              }
 
-             // Handle case where filtering results in no data AFTER checking initial load
              if (dataToUse.length === 0) { 
                  container.html(`<p class="text-neutral-500 text-center">No data currently matches criteria for ${activeHeatmapFilter}.</p>`); 
                  return; 
@@ -858,17 +859,15 @@
              const height = bounds.height;
              if (width <= 0 || height <= 0) { setTimeout(renderHeatmap, 100); return; }
 
-             // Radius scale based on value
              const maxVal = d3.max(dataToUse, d => valueAccessor(d)) || 1; 
              const radiusScale = d3.scaleSqrt().domain([0, maxVal]).range([5, Math.min(width, height) / 8]); 
 
-            // Initialize or update nodes for simulation
              let nodeMap = new Map(heatmapNodes.map(node => [symbolAccessor(node.data), node]));
              heatmapNodes = dataToUse.map(d => {
                  const existingNode = nodeMap.get(symbolAccessor(d));
                  const targetRadius = radiusScale(valueAccessor(d)) || 5; 
                  return {
-                     id: symbolAccessor(d), // Use ID for data keying
+                     id: symbolAccessor(d), 
                      data: d,
                      x: existingNode?.x || width / 2 + (Math.random() - 0.5) * 50,
                      y: existingNode?.y || height / 2 + (Math.random() - 0.5) * 50,
@@ -878,22 +877,28 @@
              });
 
              // Initialize SVG and zoom only once per heatmap instance
-             if (!heatmapSvg || heatmapSvg.empty()) { // Check if SVG needs to be created
+             if (!heatmapSvg || heatmapSvg.empty()) { 
                  container.html(''); // Clear container first
                  heatmapSvg = container.append("svg").attr("width", width).attr("height", height);
-                 heatmapZoomBehavior = d3.zoom() // Store behavior separately
+                 
+                 // **FIX**: Define content group *before* applying zoom
+                 heatmapContentGroup = heatmapSvg.append("g").attr("class", "heatmap-content"); 
+                 
+                 heatmapZoomBehavior = d3.zoom() 
                      .scaleExtent([0.5, 8])
                      .on("zoom", zoomed);
-                 heatmapSvg.call(heatmapZoomBehavior).on("dblclick.zoom", null); // Apply zoom, disable double-click zoom
-                 // Restore previous transform if it exists
+                 heatmapSvg.call(heatmapZoomBehavior).on("dblclick.zoom", null); 
+                 
+                 // Apply initial transform *after* group exists
                  heatmapSvg.call(heatmapZoomBehavior.transform, heatmapCurrentTransform); 
                  
-                 heatmapSvg.append("g").attr("class", "heatmap-content"); // Main group for bubbles
-                 
+             } else {
+                  // Ensure content group selection is up-to-date
+                 heatmapContentGroup = heatmapSvg.select(".heatmap-content"); 
              }
              
-             // Select the main content group
-             const g = heatmapSvg.select(".heatmap-content");
+             // Select the main content group using the stored variable
+             const g = heatmapContentGroup;
 
             // Initialize or restart simulation
              if (!heatmapSimulation) {
@@ -904,15 +909,15 @@
                      .force("y", d3.forceY(height / 2).strength(0.005)) 
                      .on("tick", ticked);
              } else {
-                 heatmapSimulation.nodes(heatmapNodes); // Update nodes
-                 heatmapSimulation.alpha(0.3).restart(); // Reheat simulation
+                 heatmapSimulation.nodes(heatmapNodes); 
+                 heatmapSimulation.alpha(0.3).restart(); 
              }
 
              // --- 3. Data Join ---
              const bubbleGroups = g.selectAll(".heatmap-bubble")
-                 .data(heatmapNodes, d => d.id) // Key function using ID
+                 .data(heatmapNodes, d => d.id) 
                  .join(
-                     enter => { // --- ENTER --- New bubbles
+                     enter => { 
                          const group = enter.append("g")
                              .attr("class", "heatmap-bubble")
                              .attr("transform", d => `translate(${d.x},${d.y})`)
@@ -953,36 +958,31 @@
                              
                          return group;
                      },
-                     update => { // --- UPDATE --- Existing bubbles
-                         // Update circle radius and color with transition
+                     update => { 
                          update.select("circle")
                              .transition().duration(750)
                              .attr("r", d => d.targetRadius)
                              .attr("fill", d => colorAccessor(d.data));
 
-                         // Update clip path (important for text visibility)
                          update.select("text").attr("clip-path", d => `circle(${d.targetRadius})`);
 
-                         // Update ticker label (text content, position, size)
                          update.select(".ticker-label")
                              .transition().duration(750)
-                             .attr("y", d => (d.targetRadius * heatmapCurrentTransform.k) <= 20 ? "0.1em" : "-0.2em") // Use current zoom
+                             .attr("y", d => (d.targetRadius * heatmapCurrentTransform.k) <= 20 ? "0.1em" : "-0.2em") 
                              .style("font-size", d => calculateFontSize(d.targetRadius, 2.5))
                              .text(d => symbolAccessor(d.data)) 
                              .attr("fill", d => getTextColor(colorAccessor(d.data))); 
 
-                         // Update value label (text content, opacity, size)
                          update.select(".value-label")
                               .transition().duration(750)
                               .style("font-size", d => calculateFontSize(d.targetRadius, 3))
-                              .style("opacity", d => (d.targetRadius * heatmapCurrentTransform.k) > 20 ? 1 : 0) // Use current zoom
+                              .style("opacity", d => (d.targetRadius * heatmapCurrentTransform.k) > 20 ? 1 : 0) 
                               .text(d => formatCurrency(valueAccessor(d.data)))
                               .attr("fill", d => getTextColor(colorAccessor(d.data))); 
 
                          return update;
                      },
-                     exit => { // --- EXIT --- Bubbles leaving
-                          // Remove associated node data from heatmapNodes to prevent errors
+                     exit => { 
                           heatmapNodes = heatmapNodes.filter(node => !exit.data().some(exitNode => exitNode.id === node.id));
 
                           exit.select("circle")
@@ -997,36 +997,38 @@
 
              // --- 4. Simulation Tick & Zoom ---
              function ticked() {
-                  // Update node radius towards target radius smoothly
                   heatmapNodes.forEach(node => {
                        node.r += (node.targetRadius - node.r) * 0.1; 
                   });
-                  // Update simulation collision radius
-                  if (heatmapSimulation) { // Check if simulation exists
+                  if (heatmapSimulation) { 
                     heatmapSimulation.force("collide").radius(d => d.r + 2);
                   }
-
-                  // Update visual position
-                  bubbleGroups
+                  // **FIX**: Select bubbleGroups within ticked to ensure it has the latest selection
+                  g.selectAll(".heatmap-bubble") 
                      .attr("transform", d => `translate(${d.x},${d.y})`);
              }
 
              function zoomed(event) {
                  const { transform } = event;
-                 heatmapCurrentTransform = transform; // Store current transform
-                 g.attr("transform", transform); // Apply zoom transform
+                 heatmapCurrentTransform = transform; 
+                 
+                 // **FIX**: Apply transform to the correct group ('g' which is heatmapContentGroup)
+                 if (heatmapContentGroup) {
+                    heatmapContentGroup.attr("transform", transform); 
+                 } else {
+                     console.error("Heatmap content group not found during zoom.");
+                 }
 
-                 // Update value label visibility on zoom
-                 bubbleGroups.selectAll(".value-label")
-                      // No transition needed here, opacity adjusts instantly based on current zoom
+                 // Update value label visibility on zoom - select within the correct group 'g'
+                 g.selectAll(".heatmap-bubble .value-label") 
                      .style("opacity", d => (d.r * transform.k) > 20 ? 1 : 0);
 
-                 // Update ticker label Y position on zoom
-                  bubbleGroups.selectAll(".ticker-label")
+                 // Update ticker label Y position on zoom - select within the correct group 'g'
+                  g.selectAll(".heatmap-bubble .ticker-label")
                        .attr("y", d => (d.r * transform.k) <= 20 ? "0.1em" : "-0.2em");
              }
 
-             // --- 5. Helper Functions ---
+             // --- 5. Helper Functions --- (handleMouseOver, handleMouseOut, getTextColor, calculateFontSize, drag - remain the same)
              function handleMouseOver(event, d) {
                  d3.select(this).raise(); 
                  tooltip.style("opacity", .9);
@@ -1049,26 +1051,23 @@
                   return color && d3.lab(color).l < 60 ? "#fff" : "#eee"; 
              }
              function calculateFontSize(radius, factor) {
-                 // Scale font size more aggressively for smaller bubbles, clamp at min/max
                  const baseSize = radius / factor;
                  return Math.max(6, Math.min(10, baseSize)) + 'px'; 
              }
-            
-             // Drag behavior for force simulation nodes
              function drag(simulation) {
                  function dragstarted(event, d) {
                      if (!event.active) simulation.alphaTarget(0.3).restart();
-                     d.fx = d.x; // Fix position on drag start
+                     d.fx = d.x; 
                      d.fy = d.y;
-                     d3.select(this).raise(); // Bring dragged bubble to front
+                     d3.select(this).raise(); 
                  }
                  function dragged(event, d) {
-                     d.fx = event.x; // Update fixed position
+                     d.fx = event.x; 
                      d.fy = event.y;
                  }
                  function dragended(event, d) {
-                     if (!event.active) simulation.alphaTarget(0); // Cool down simulation
-                     d.fx = null; // Release fixed position
+                     if (!event.active) simulation.alphaTarget(0); 
+                     d.fx = null; 
                      d.fy = null;
                  }
                  return d3.drag()
@@ -1078,7 +1077,7 @@
              }
         }
         
-        // --- Data Fetching & Rendering --- (Keep existing functions)
+        // --- Data Fetching & Rendering --- (Keep existing functions: startDataFetching, stopDataFetching, fetchAndRenderFlow, fetchAndRenderAftermarketFlow, fetchAndRenderNews, fetchAndRenderCrypto, processFlowUpdate, processAftermarketUpdate, createFlowRowElement, createAftermarketRowElement, updateFlowTable, renderAftermarketTable, renderNewsFeed, renderCryptoFlowTable, getFilteredAndSortedData)
          // Simplified startDataFetching - Runs continuously
         function startDataFetching() {
              stopDataFetching(); 
