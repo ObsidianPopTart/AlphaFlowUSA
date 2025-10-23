@@ -51,14 +51,41 @@
         .alert-banner { animation: slideInDown 0.5s ease-out forwards; }
         
         /* Heatmap Styles */
-        #heatmap-container { overflow: hidden; /* Prevent scrollbars within container */ }
-        #heatmap-container svg { display: block; /* Remove extra space below SVG */ cursor: grab; }
+        #heatmap-container { overflow: hidden; /* Prevent scrollbars within container */ position: relative; /* Needed for tooltip positioning */ }
+        #heatmap-container svg { display: block; /* Remove extra space below SVG */ cursor: grab; background-color: #18181b; /* Darker background for contrast */ border-radius: 0.5rem;}
         #heatmap-container svg:active { cursor: grabbing; }
         .heatmap-bubble { cursor: pointer; }
-        .heatmap-bubble circle { transition: transform 0.3s ease, filter 0.3s ease; }
-        .heatmap-bubble:hover circle { transform: scale(1.05); filter: brightness(1.1); }
-        .heatmap-bubble text { pointer-events: none; /* Make text non-interactive */ font-size: 10px; }
+        .heatmap-bubble circle { 
+            transition: transform 0.2s ease, filter 0.2s ease, stroke-width 0.2s ease; 
+            stroke: #4a4a4a; 
+            stroke-width: 1.5;
+        }
+        .heatmap-bubble:hover circle { 
+            transform: scale(1.05); /* Keep swell effect */
+            filter: brightness(1.2); /* Slightly brighter */
+            stroke-width: 3; /* Bolder border */
+            stroke: #e5e7eb; /* Lighter border on hover */
+        }
+        .heatmap-bubble text { pointer-events: none; /* Make text non-interactive */ font-size: 10px; text-anchor: middle; alignment-baseline: central; }
         .heatmap-bubble .value-label { transition: opacity 0.2s ease-in-out; } /* Transition for value label opacity */
+         /* Tooltip Style */
+        .heatmap-tooltip {
+            opacity: 0; /* Hidden by default */
+            position: absolute; /* Position relative to heatmap container */
+            background-color: rgba(10, 10, 10, 0.85); /* Darker semi-transparent bg */
+            border: 1px solid #52525b;
+            border-radius: 0.375rem; /* Equivalent to rounded-md */
+            padding: 0.5rem; /* Equivalent to p-2 */
+            font-size: 0.75rem; /* Equivalent to text-xs */
+            color: #e5e7eb; /* Light text */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* Shadow */
+            pointer-events: none; /* Prevent tooltip from blocking mouse events */
+            z-index: 30; /* Ensure tooltip is above bubbles */
+            transition: opacity 0.2s ease-in-out;
+            white-space: nowrap; /* Prevent line breaks */
+        }
+         .heatmap-tooltip b { color: #fb923c; /* Orange color for ticker/name */ }
+
 
         .page-container { overflow-y: auto; height: calc(100vh - 110px); }
         .modal { transition: opacity 0.25s ease; }
@@ -172,7 +199,14 @@
                             </div>
                         </div>
 
-                         <div id="heatmap-view" class="hidden flex-grow p-4 flex items-center justify-center"><div id="heatmap-container" class="w-full h-full max-w-full max-h-full"></div></div>
+                         <div id="heatmap-view" class="hidden flex-grow p-4 flex items-center justify-center">
+                             <!-- Tooltip will be positioned relative to this container -->
+                             <div id="heatmap-container" class="w-full h-full max-w-full max-h-full">
+                                 <!-- SVG is generated here -->
+                             </div>
+                             <!-- Tooltip Element (moved out of SVG for better positioning) -->
+                             <div id="heatmap-tooltip" class="heatmap-tooltip"></div> 
+                         </div>
                          
                          <div id="crypto-view" class="hidden flex-grow overflow-y-auto">
                             <table class="w-full text-left text-xs">
@@ -703,15 +737,17 @@
             }
         }
         
-       function renderHeatmap() {
+        // **UPDATED** renderHeatmap with zoom and label logic
+        function renderHeatmap() {
              const container = d3.select("#heatmap-container");
-             container.html(''); // Clear previous heatmap
+             const tooltip = d3.select("#heatmap-tooltip"); // Select existing tooltip element
+             container.select("svg").remove(); // Clear previous SVG content
 
             let dataToUse = [];
             let valueAccessor = d => d.totalPremium; 
             let symbolAccessor = d => d.symbol;
             let nameAccessor = d => d.symbol; 
-            let colorAccessor; // Function to determine fill color based on type
+            let colorAccessor; 
 
              if (activeHeatmapFilter === 'options') {
                  if (!initialFlowLoadComplete) {
@@ -735,13 +771,12 @@
                  valueAccessor = d => d.totalPremium;
                  symbolAccessor = d => d.symbol;
                  nameAccessor = d => d.symbol;
-                 // **UPDATED** Color logic for options: Green/Red/Gray based on bullish ratio
                  colorAccessor = d => {
-                     if (d.totalPremium === 0) return '#a3a3a3'; // Gray for neutral/zero
+                     if (!d || d.totalPremium === undefined || d.bullishPremium === undefined || d.totalPremium === 0) return '#a3a3a3'; 
                      const bullishRatio = d.bullishPremium / d.totalPremium;
                      if (bullishRatio > 0.5) return '#22c55e'; // Green
                      if (bullishRatio < 0.5) return '#ef4444'; // Red
-                     return '#a3a3a3'; // Gray for exactly 50%
+                     return '#a3a3a3'; // Gray 
                  };
 
              } else { // Crypto
@@ -759,14 +794,14 @@
                      volume24h: c.quote.USD.volume_24h,
                      change24h: c.quote.USD.percent_change_24h
                  }));
-                 valueAccessor = d => d.volume24h; // Size bubbles by 24h volume
+                 valueAccessor = d => d.volume24h; 
                  symbolAccessor = d => d.symbol;
                  nameAccessor = d => d.name;
-                  // Color bubbles by 24h change (Green/Red/Gray)
                  colorAccessor = d => {
-                    if (d.change24h > 0) return '#22c55e'; // Green
-                    if (d.change24h < 0) return '#ef4444'; // Red
-                    return '#a3a3a3'; // Gray for zero change
+                     if (!d || d.change24h === undefined) return '#a3a3a3'; 
+                     if (d.change24h > 0) return '#22c55e'; // Green
+                     if (d.change24h < 0) return '#ef4444'; // Red
+                     return '#a3a3a3'; // Gray 
                  };
              }
 
@@ -775,7 +810,6 @@
                  return;
              }
              
-             // Ensure container has dimensions
              const containerNode = container.node();
              if (!containerNode) return;
              const bounds = containerNode.getBoundingClientRect();
@@ -783,75 +817,75 @@
              const height = bounds.height;
               if (width <= 0 || height <= 0) {
                  console.warn("Heatmap container has no dimensions yet.");
+                 // Fallback: Use timeout to retry rendering after layout settles
+                 setTimeout(renderHeatmap, 100); 
                  return; 
              }
 
 
              const pack = d3.pack().size([width, height]).padding(5);
-             // Ensure valueAccessor returns a positive number for packing
-             const root = pack(d3.hierarchy({ children: dataToUse }).sum(d => Math.max(1, valueAccessor(d) || 0))); // Use Math.max(1,...) to avoid zero/negative radius
+             const root = pack(d3.hierarchy({ children: dataToUse }).sum(d => Math.max(1, valueAccessor(d) || 0))); 
              
-             const svg = container.append("svg").attr("width", width).attr("height", height).attr("font-size", 10).attr("text-anchor", "middle");
+             const svg = container.append("svg").attr("width", width).attr("height", height);
 
-              // **NEW** Zoom Behavior
              const zoom = d3.zoom()
-                 .scaleExtent([0.5, 8]) // Min/max zoom levels
+                 .scaleExtent([0.5, 8]) // Adjusted scale extent
                  .on("zoom", zoomed);
 
-             svg.call(zoom); // Apply zoom behavior to the SVG
+             svg.call(zoom); 
 
              const g = svg.append("g"); // Group for zoomable elements
 
 
-             // Tooltip
-             const tooltip = d3.select("body").append("div") // Append to body to avoid clipping
-                .style("opacity", 0)
-                .attr("class", "absolute bg-neutral-900 border border-neutral-700 rounded-md p-2 text-xs shadow-lg pointer-events-none z-[70]"); // Ensure high z-index
-
-
-             const bubbles = g.selectAll(".heatmap-bubble") // Select groups within the zoomable group
+             const bubbles = g.selectAll(".heatmap-bubble") 
                  .data(root.leaves())
                  .enter().append("g")
                  .attr("class", "heatmap-bubble")
                  .attr("transform", d => `translate(${d.x},${d.y})`)
-                 .on("click", (event, d) => showChartView(symbolAccessor(d.data)))
-                 .on("mouseover", (event, d) => {
-                     tooltip.transition().duration(200).style("opacity", .9);
+                 .on("click", (event, d) => {
+                      event.stopPropagation(); // Prevent zoom trigger on click
+                      showChartView(symbolAccessor(d.data))
+                 })
+                 .on("mouseover", function(event, d) { // Use function to access `this`
+                     d3.select(this).raise(); // Bring bubble to front on hover
+                     tooltip.style("opacity", .9);
                      let tooltipText = `<b>${symbolAccessor(d.data)}</b> (${nameAccessor(d.data)})<br/>`;
                      if (activeHeatmapFilter === 'options') {
                          tooltipText += `Premium: ${formatCurrency(d.data.totalPremium)}<br/>Sentiment: ${d.data.totalPremium > 0 ? ((d.data.bullishPremium / d.data.totalPremium)*100).toFixed(0) : 'N/A'}% Bullish`;
                      } else {
-                          tooltipText += `Volume (24h): ${formatCurrency(d.data.volume24h)}<br/>Change (24h): ${d.data.change24h.toFixed(2)}%`;
+                          tooltipText += `Volume (24h): ${formatCurrency(d.data.volume24h)}<br/>Change (24h): ${d.data.change24h ? d.data.change24h.toFixed(2) : 'N/A'}%`;
                      }
+                     // Position tooltip relative to the container, near the mouse
+                     const [mouseX, mouseY] = d3.pointer(event, container.node());
                      tooltip.html(tooltipText)
-                         .style("left", (event.pageX + 15) + "px") // Position tooltip near cursor
-                         .style("top", (event.pageY - 28) + "px");
+                         .style("left", (mouseX + 15) + "px") 
+                         .style("top", (mouseY) + "px"); // Adjust y-offset if needed
                  })
-                 .on("mouseout", (event, d) => {
-                     tooltip.transition().duration(500).style("opacity", 0);
+                 .on("mouseout", function(event, d) { // Use function
+                     tooltip.style("opacity", 0);
                  });
 
              bubbles.append("circle")
                  .attr("r", d => d.r)
-                 .attr("fill", d => colorAccessor(d.data)) // Use the unified colorAccessor
-                 .attr("stroke", "#4a4a4a")
-                 .attr("stroke-width", 1.5);
+                 .attr("fill", d => colorAccessor(d.data)) ; // Stroke defined in CSS
 
-            // Text Elements (Ticker always visible, Value visibility depends on zoom)
+            // Text Elements 
             const textGroups = bubbles.append("text")
-                 .attr("clip-path", d => `circle(${d.r})`); // Prevent text overflow
+                 .attr("clip-path", d => `circle(${d.r})`); 
 
             // Ticker (Always add)
              textGroups.append("tspan")
                  .attr("class", "ticker-label")
                  .attr("x", 0)
-                 .attr("y", d => d.r > 15 ? "-0.2em" : "0.3em") // Adjust position based on whether value is likely shown
+                  // Conditional Y position: Single line if value hidden, top line if value shown
+                 .attr("y", d => d.r <= 20 ? "0.1em" : "-0.2em") 
                  .attr("fill", d => { 
                       const color = d3.color(colorAccessor(d.data));
+                      // Ensure color is valid before calculating luminance
                       return color && d3.lab(color).l < 60 ? "#fff" : "#eee"; 
                  })
                  .attr("font-weight", "bold")
-                 .style("font-size", d => Math.max(6, Math.min(10, d.r / 2.5)) + 'px') // Dynamic font size based on radius
+                 .style("font-size", d => Math.max(6, Math.min(10, d.r / 2.5)) + 'px') // Dynamic font size
                  .text(d => symbolAccessor(d.data));
 
             // Value (Add but maybe hide initially)
@@ -861,13 +895,13 @@
                  .attr("y", "0.9em") // Position below ticker
                  .attr("fill", d => { 
                       const color = d3.color(colorAccessor(d.data));
+                      // Ensure color is valid
                       return color && d3.lab(color).l < 60 ? "#fff" : "#eee"; 
                  })
-                 .style("font-size", d => Math.max(5, Math.min(9, d.r / 3)) + 'px') // Slightly smaller font size
-                 .style("opacity", d => d.r > 20 ? 1 : 0) // Hide initially if small
+                 .style("font-size", d => Math.max(5, Math.min(9, d.r / 3)) + 'px') 
+                 .style("opacity", d => d.r > 20 ? 1 : 0) // Hide initially if small (matches threshold in zoomed)
                  .text(d => formatCurrency(valueAccessor(d.data)));
                  
-             // **NEW** Zoomed function
              function zoomed(event) {
                  const { transform } = event;
                  g.attr("transform", transform); // Apply zoom transform to the group
@@ -876,17 +910,17 @@
                  bubbles.selectAll(".value-label")
                      .style("opacity", d => (d.r * transform.k) > 20 ? 1 : 0); // Show if apparent radius > 20px
 
-                  // Optional: Adjust font size slightly on zoom? (Can impact performance)
-                 // bubbles.selectAll(".ticker-label")
-                 //     .style("font-size", d => Math.max(6, Math.min(10, (d.r * transform.k) / 2.5)) + 'px');
-                 // bubbles.selectAll(".value-label")
-                 //     .style("font-size", d => Math.max(5, Math.min(9, (d.r * transform.k) / 3)) + 'px');
+                 // Adjust ticker label Y position based on whether value is visible now
+                 bubbles.selectAll(".ticker-label")
+                      .attr("y", d => (d.r * transform.k) <= 20 ? "0.1em" : "-0.2em"); 
              }
-
+             // Initial zoom adjustment if needed (optional)
+             // zoom.translateTo(svg, width / 2, height / 2);
+             // zoom.scaleTo(svg, 1);
          }
         
-        // --- Data Fetching & Rendering ---
-        // Simplified startDataFetching - Runs continuously
+        // --- Data Fetching & Rendering --- (Keep existing functions: startDataFetching, stopDataFetching, fetchAndRenderFlow, fetchAndRenderAftermarketFlow, fetchAndRenderNews, fetchAndRenderCrypto)
+         // Simplified startDataFetching - Runs continuously
         function startDataFetching() {
              stopDataFetching(); 
              initialFlowLoadComplete = false; 
