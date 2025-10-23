@@ -49,9 +49,17 @@
         }
         @keyframes slideInDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .alert-banner { animation: slideInDown 0.5s ease-out forwards; }
+        
+        /* Heatmap Styles */
+        #heatmap-container { overflow: hidden; /* Prevent scrollbars within container */ }
+        #heatmap-container svg { display: block; /* Remove extra space below SVG */ cursor: grab; }
+        #heatmap-container svg:active { cursor: grabbing; }
         .heatmap-bubble { cursor: pointer; }
         .heatmap-bubble circle { transition: transform 0.3s ease, filter 0.3s ease; }
         .heatmap-bubble:hover circle { transform: scale(1.05); filter: brightness(1.1); }
+        .heatmap-bubble text { pointer-events: none; /* Make text non-interactive */ font-size: 10px; }
+        .heatmap-bubble .value-label { transition: opacity 0.2s ease-in-out; } /* Transition for value label opacity */
+
         .page-container { overflow-y: auto; height: calc(100vh - 110px); }
         .modal { transition: opacity 0.25s ease; }
         .modal-content { transition: transform 0.25s ease; }
@@ -60,8 +68,8 @@
         .call-row { border-left: 3px solid #22c55e; }
         .put-row { border-left: 3px solid #ef4444; }
         #options-tbody tr:first-child { /* Style first row differently if needed */ }
-        /* Styles for the new after-hours section */
-        #aftermarket-flow-view { max-height: 300px; overflow-y: auto; } /* Limit height and add scroll */
+        /* Styles for the after-hours section */
+        #aftermarket-flow-view { max-height: 300px; overflow-y: auto; border-top: 1px solid #3f3f46; /* Add separator */ margin-top: 8px; padding-top: 8px; }
     </style>
 </head>
 <body class="text-sm">
@@ -136,30 +144,31 @@
                                 <button data-heatmap-filter="crypto" class="heatmap-filter-button px-3 py-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 transition-colors text-xs">Crypto</button>
                              </div>
                         </div>
-                        <div id="market-status-container" class="p-3 text-center border-b border-neutral-800"></div>
                         
-                        <!-- Main Unusual Options Flow View -->
-                        <div id="flow-view" class="flex-grow overflow-y-auto">
-                            <table class="w-full text-left text-xs">
-                                <thead class="sticky-header text-neutral-400 uppercase bg-neutral-900"><tr><th class="p-2">Time</th><th class="p-2">Ticker</th><th class="p-2">Details</th><th class="p-2">Sentiment</th><th class="p-2 text-right">Premium</th><th class="p-2 text-right">Vol / OI</th></tr></thead>
-                                <tbody id="options-tbody" class="divide-y divide-neutral-800">
-                                    <tr id="flow-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Initializing flow...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <!-- NEW After-Hours Trade View (Initially Hidden) -->
-                        <div id="aftermarket-flow-view" class="hidden p-3 border-t border-neutral-800">
-                             <h3 class="text-sm font-semibold text-neutral-300 mb-2 text-center">Latest After-Hours Trades (Major Tickers)</h3>
-                             <div class="max-h-48 overflow-y-auto"> <!-- Limit height and scroll -->
+                        <!-- Main Unusual Options Flow View & After Hours -->
+                        <div id="flow-view" class="flex-grow flex flex-col p-3"> <!-- Make flex-col -->
+                            <h3 class="text-lg font-semibold text-neutral-200 mb-2 flex-shrink-0">Options Activity</h3>
+                            <div class="overflow-y-auto flex-grow mb-2"> <!-- Scrollable main table -->
                                 <table class="w-full text-left text-xs">
-                                    <thead class="sticky-header text-neutral-400 uppercase bg-neutral-900 text-xs">
-                                        <tr><th class="p-1.5">Time</th><th class="p-1.5">Ticker</th><th class="p-1.5 text-right">Price</th><th class="p-1.5 text-right">Size</th><th class="p-1.5 text-right">Premium</th></tr>
-                                    </thead>
-                                    <tbody id="aftermarket-options-tbody" class="divide-y divide-neutral-800">
-                                        <tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">Fetching after-hours trades...</td></tr>
+                                    <thead class="sticky-header text-neutral-400 uppercase bg-neutral-900"><tr><th class="p-2">Time</th><th class="p-2">Ticker</th><th class="p-2">Details</th><th class="p-2">Sentiment</th><th class="p-2 text-right">Premium</th><th class="p-2 text-right">Vol / OI</th></tr></thead>
+                                    <tbody id="options-tbody" class="divide-y divide-neutral-800">
+                                        <tr id="flow-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Initializing flow... Check Crypto & News feeds below.</td></tr>
                                     </tbody>
                                 </table>
+                            </div>
+                             <!-- After-Hours Trade View - Now always potentially visible within flow view -->
+                             <div id="aftermarket-flow-view" class="flex-shrink-0"> <!-- Removed hidden, added flex-shrink-0 -->
+                                 <h3 class="text-sm font-semibold text-neutral-300 mb-2 text-center">Latest After-Hours Trades (Major Tickers)</h3>
+                                 <div class="max-h-48 overflow-y-auto border border-neutral-700 rounded-md"> <!-- Limit height, add border -->
+                                    <table class="w-full text-left text-xs">
+                                        <thead class="sticky top-0 text-neutral-400 uppercase bg-neutral-800 text-xs"> <!-- Slightly different bg, sticky -->
+                                            <tr><th class="p-1.5">Time</th><th class="p-1.5">Ticker</th><th class="p-1.5 text-right">Price</th><th class="p-1.5 text-right">Size</th><th class="p-1.5 text-right">Premium</th></tr>
+                                        </thead>
+                                        <tbody id="aftermarket-options-tbody" class="divide-y divide-neutral-800">
+                                            <tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">Monitoring after-hours trades...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
 
@@ -278,23 +287,17 @@
     <script type="module" defer>
         // Firebase Imports (v11.6.1)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"; // Added setLogLevel
+        import { getAuth, signInAnonymously, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"; // Added Anonymous sign in
+        import { getFirestore, doc, setDoc, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"; 
         
         // --- Configuration ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyDBQ0pvfmG9x3m8Da5Tsiekh6fermbKkQs",
-            authDomain: "alpha-flow-6c416.firebaseapp.com",
-            projectId: "alpha-flow-6c416",
-            storageBucket: "alpha-flow-6c416.appspot.com",
-            messagingSenderId: "1055894597563",
-            appId: "1:1055894597563:web:88c50b5907c4badc3b9e9e"
-        };
+        // REMOVED hardcoded firebaseConfig
         const STRIPE_PUBLISHABLE_KEY = 'YOUR_STRIPE_PUBLISHABLE_KEY'; // REPLACE THIS
         const ADMIN_EMAIL = "travisclevenger.tc@gmail.com";
         const CRYPTO_LIMIT = 100; // Fetch Top 100 Cryptos
         const MAX_FLOW_ROWS = 150; // Max rows to keep in the main flow table
         const MAX_AFTERMARKET_ROWS = 50; // Max rows for aftermarket table
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // Get App ID
 
         // Secure Netlify Function Endpoints
         const CMC_PROXY_URL = '/.netlify/functions/crypto';
@@ -305,21 +308,21 @@
         // --- App State ---
         let app, auth, db;
         let stripe;
-        let flowInterval, newsInterval, cryptoInterval, dbUnsubscribe, marketCountdownInterval;
-        let aftermarketFlowInterval; // New interval timer for after hours
+        let flowInterval, newsInterval, cryptoInterval, dbUnsubscribe; 
+        let aftermarketFlowInterval; 
         let currentFlowData = [], currentNewsData = [], currentCryptoData = [];
-        let currentAftermarketData = []; // New array for after-hours trades
-        let displayedFlowItems = new Set(); // Use a generic name for tracking displayed items (both main and aftermarket)
+        let currentAftermarketData = []; 
+        let displayedFlowItems = new Set(); 
         let userWatchlist = new Set(), userAlerts = [];
         let isPaused = false;
         let activeFilter = 'all', activeSort = 'timestamp-desc', activePremiumFilter = 0;
-        let activeHeatmapFilter = 'options'; // 'options' or 'crypto'
+        let activeHeatmapFilter = 'options'; 
         let currentUser = null, currentUserData = null;
         let DOMElements; 
         let authReady = false;
         let initialFlowLoadComplete = false;
         let initialCryptoLoadComplete = false;
-        let initialAftermarketLoadComplete = false; // New flag
+        let initialAftermarketLoadComplete = false; 
 
         // --- Error Handling for Initialization ---
         function showInitializationError(message) {
@@ -359,13 +362,38 @@
         
         function loadUserData(user) {
             if (dbUnsubscribe) dbUnsubscribe();
-            const userRef = doc(db, "users", user.uid);
+            
+            // **Corrected Path:** Use an even number of segments for the document path
+            // Structure: /artifacts/{appId}/users/{userId}
+            const userDocPath = `artifacts/${appId}/users/${user.uid}`; 
+            console.log(`Setting up listener for user data at: ${userDocPath}`); // Debug log
+            const userRef = doc(db, userDocPath);
+
             dbUnsubscribe = onSnapshot(userRef, async (docSnap) => {
+                console.log(`Snapshot received for ${userDocPath}. Exists: ${docSnap.exists()}`); // Debug log
                 if (!docSnap.exists()) {
-                    const newUser = { email: user.email, plan: user.email === ADMIN_EMAIL ? 'admin' : 'free', watchlist: ["SPY", "QQQ", "BTC"], alerts: [{ ticker: 'TSLA', premium: 250000 }], apiKey: `alphaflow-${crypto.randomUUID()}` };
-                    await setDoc(userRef, newUser);
-                    currentUserData = newUser;
-                } else { currentUserData = docSnap.data(); }
+                    console.log(`Document doesn't exist, creating new user profile at ${userDocPath}`); // Debug log
+                    const newUser = { 
+                        email: user.email, 
+                        plan: user.email === ADMIN_EMAIL ? 'admin' : 'free', 
+                        watchlist: ["SPY", "QQQ", "BTC"], 
+                        alerts: [{ ticker: 'TSLA', premium: 250000 }], 
+                        apiKey: `alphaflow-${crypto.randomUUID()}` 
+                    };
+                    try {
+                        await setDoc(userRef, newUser);
+                        console.log(`Successfully created new user profile at ${userDocPath}`); // Debug log
+                        currentUserData = newUser;
+                    } catch (setErr) {
+                         console.error(`Firestore setDoc error creating profile at ${userDocPath}:`, setErr); // Detailed error
+                         showAlertBanner(`Error creating user profile: ${setErr.message}`);
+                         // Handle error appropriately, maybe prevent further app load
+                         return;
+                    }
+                } else { 
+                    currentUserData = docSnap.data(); 
+                    console.log(`Loaded user data from ${userDocPath}:`, currentUserData); // Debug log
+                }
                 userWatchlist = new Set(currentUserData.watchlist || []);
                 userAlerts = currentUserData.alerts || [];
                 
@@ -373,9 +401,13 @@
                     handleSignedInState();
                 }
             }, (error) => {
-                console.error("Firestore onSnapshot error:", error);
-                showAlertBanner("Error connecting to user database. Check Firestore rules and API key permissions.");
-                 showInitializationError(`Firestore Error: ${error.message}. This is likely a permissions issue. Ensure your Firestore rules allow reads/writes and the API key is correct.`);
+                // **Log the detailed error:**
+                console.error(`Firestore onSnapshot error for path ${userDocPath}:`, error); 
+                console.error("Error Code:", error.code);
+                console.error("Error Message:", error.message);
+                
+                showAlertBanner(`Error connecting to user database: ${error.message}. Please check console.`);
+                 showInitializationError(`Firestore Error: ${error.message}. This could be a permissions issue (check Firestore rules) or a problem with the path ${userDocPath}.`);
             });
         }
         
@@ -391,26 +423,24 @@
             renderWatchlist(); 
             renderAlerts(); 
             lucide.createIcons();
-            if(marketCountdownInterval) clearInterval(marketCountdownInterval);
-            marketCountdownInterval = setInterval(updateMarketCountdown, 1000);
-            updateMarketCountdown(); // Initial call to set status and start correct fetch loops
+            // REMOVED market countdown interval start
         }
 
         function handleSignedOutState() {
             if (dbUnsubscribe) dbUnsubscribe();
-            if(marketCountdownInterval) clearInterval(marketCountdownInterval);
+            // REMOVED market countdown interval clear
             currentUserData = null;
             currentUser = null;
-            stopDataFetching(); // Ensure all intervals are stopped
+            stopDataFetching(); 
             initialFlowLoadComplete = false; 
             initialCryptoLoadComplete = false;
-            initialAftermarketLoadComplete = false; // Reset new flag
+            initialAftermarketLoadComplete = false; 
             displayedFlowItems.clear(); 
             if (DOMElements) {
                 // Clear tables and show placeholders on sign out
                 DOMElements.optionsTbody.innerHTML = '<tr id="flow-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Sign in to view flow.</td></tr>';
-                DOMElements.aftermarketOptionsTbody.innerHTML = '<tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">Sign in to view flow.</td></tr>'; // Clear aftermarket table too
-                DOMElements.aftermarketFlowView.classList.add('hidden'); // Hide aftermarket section
+                DOMElements.aftermarketOptionsTbody.innerHTML = '<tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">Sign in to view flow.</td></tr>'; 
+                DOMElements.aftermarketFlowView.classList.add('hidden'); 
                 DOMElements.cryptoTbody.innerHTML = '<tr id="crypto-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Sign in to view crypto data.</td></tr>';
                 DOMElements.heatmapContainer.innerHTML = '<p class="text-neutral-500 text-center">Sign in to view heatmap.</p>';
                 DOMElements.newsFeed.innerHTML = '<p class="text-center text-neutral-500 p-8 text-xs">Sign in to view news.</p>';
@@ -427,7 +457,22 @@
             }
         }
         
-        async function updateUserData(data) { if (currentUser) { await setDoc(doc(db, "users", currentUser.uid), data, { merge: true }); } }
+        // **Corrected Path:** Use an even number of segments for the document path
+        async function updateUserData(data) { 
+            if (currentUser && db) { 
+                const userDocPath = `artifacts/${appId}/users/${currentUser.uid}`;
+                console.log(`Updating user data at: ${userDocPath}`, data); // Debug log
+                try {
+                    await setDoc(doc(db, userDocPath), data, { merge: true });
+                    console.log(`Successfully updated user data at ${userDocPath}`); // Debug log
+                } catch (updateErr) {
+                     console.error(`Firestore setDoc error updating profile at ${userDocPath}:`, updateErr); // Detailed error
+                     showAlertBanner(`Error saving user data: ${updateErr.message}`);
+                }
+            } else {
+                 console.warn("Cannot update user data: No current user or db instance.");
+            }
+         }
 
         function renderHeader() {
             const headerAuthLinks = document.getElementById('header-auth-links');
@@ -640,13 +685,9 @@
             DOMElements.cryptoControls.classList.toggle('hidden', !isCryptoView);
             DOMElements.heatmapControls.classList.toggle('hidden', !isHeatmapView); // Show heatmap controls only for heatmap view
             
-            // Show/Hide aftermarket flow view based on market status IF flow view is active
-            if(isFlowView) {
-                const marketStatus = getMarketStatus();
-                DOMElements.aftermarketFlowView.classList.toggle('hidden', marketStatus.isOpen);
-            } else {
-                 DOMElements.aftermarketFlowView.classList.add('hidden'); // Always hide if not in flow view
-            }
+            // Aftermarket view is part of the flow view's structure now
+            DOMElements.aftermarketFlowView.classList.toggle('hidden', !isFlowView); 
+
 
             if (view === 'heatmap') {
                 // Use requestAnimationFrame to ensure the container is visible and has dimensions
@@ -804,11 +845,12 @@
          }
         
         // --- Data Fetching & Rendering ---
+        // Simplified startDataFetching - Runs continuously
         function startDataFetching() {
-             stopDataFetching(); // Clear existing intervals
+             stopDataFetching(); 
              initialFlowLoadComplete = false; 
              initialCryptoLoadComplete = false;
-             initialAftermarketLoadComplete = false; // Reset aftermarket flag too
+             initialAftermarketLoadComplete = false; 
              
              // Clear placeholders
              const flowPlaceholder = document.getElementById('flow-placeholder');
@@ -818,35 +860,24 @@
              const aftermarketPlaceholder = document.getElementById('aftermarket-flow-placeholder');
              if (aftermarketPlaceholder) aftermarketPlaceholder.remove();
 
-
              if (!currentUserData || !authReady) return;
 
              const plan = DOMElements.adminPanel.classList.contains('hidden') ? (currentUserData.plan) : DOMElements.adminPlanSelector.value;
             
              if (plan !== 'free') {
-                 // Always fetch crypto and news
+                 // Always fetch crypto and news initially and set intervals
                  fetchAndRenderCrypto(true); 
                  fetchAndRenderNews();
                  cryptoInterval = setInterval(() => fetchAndRenderCrypto(false), 300000); 
                  newsInterval = setInterval(fetchAndRenderNews, 300000); 
 
-                 // --- Conditional Fetching based on Market Status ---
-                 // This will be called again by updateMarketCountdown, but good to set initial state
-                 const marketStatus = getMarketStatus();
-                 if (marketStatus.isOpen) {
-                     fetchAndRenderFlow(null, true); 
-                     flowInterval = setInterval(() => fetchAndRenderFlow(null, false), 90000); 
-                     DOMElements.aftermarketFlowView.classList.add('hidden'); 
-                 } else {
-                     if (currentFlowData.length > 0) {
-                         updateFlowTable(); 
-                     } else {
-                         fetchAndRenderFlow(null, true); // Try to get EOD data
-                     }
-                     fetchAndRenderAftermarketFlow(true); 
-                     aftermarketFlowInterval = setInterval(() => fetchAndRenderAftermarketFlow(false), 180000); 
-                     DOMElements.aftermarketFlowView.classList.remove('hidden'); 
-                 }
+                 // Always fetch unusual flow initially and set interval
+                 fetchAndRenderFlow(null, true); 
+                 flowInterval = setInterval(() => fetchAndRenderFlow(null, false), 90000); 
+
+                 // Always fetch aftermarket flow initially and set interval
+                 fetchAndRenderAftermarketFlow(true); 
+                 aftermarketFlowInterval = setInterval(() => fetchAndRenderAftermarketFlow(false), 180000); 
                  
              } else {
                  // Show upgrade messages for free plan
@@ -873,16 +904,11 @@
              if (isPaused && !ticker) return; 
              if (document.hidden && !ticker) return; 
 
-             if (isInitialLoad && DOMElements.optionsTbody.children.length === 0) {
-                 const placeholder = document.createElement('tr');
-                 placeholder.id = 'flow-placeholder';
-                 placeholder.innerHTML = `<td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest flow data...</td>`;
-                 DOMElements.optionsTbody.appendChild(placeholder);
+             if (isInitialLoad && DOMElements.optionsTbody.children.length === 0 && !initialFlowLoadComplete) { // Only show placeholder if truly initial
+                 DOMElements.optionsTbody.innerHTML = `<tr id="flow-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest market activity... Check Crypto & News feeds while you wait.</td></tr>`;
              }
              
              const newData = await fetchOptionsFlowData(ticker); // Calls FMP_PROXY_URL
-             const placeholder = document.getElementById('flow-placeholder');
-             if (placeholder) placeholder.remove(); 
              
              if (newData !== null) { // Check if fetch was successful (not null)
                 processFlowUpdate(newData); // Process newData (even if it's [])
@@ -898,27 +924,26 @@
              } else {
                  // Fetch failed (returned null) - show error only if no data has ever been loaded
                  if (!initialFlowLoadComplete && DOMElements.optionsTbody.children.length === 0) { 
-                      DOMElements.optionsTbody.innerHTML = `<tr id="flow-placeholder"><td colspan="6" class="text-center text-red-400 p-12">Failed to fetch options flow data. API may be down or unavailable.</td></tr>`;
+                      const placeholder = document.getElementById('flow-placeholder');
+                      if (placeholder) placeholder.innerHTML = `<td colspan="6" class="text-center text-red-400 p-12">Failed to fetch options flow data. API may be down or unavailable.</td>`;
                  }
                  // If fetch failed but we have old data, the API banner shows the error, keep old data.
              }
+             // Ensure placeholder is removed if it wasn't already (e.g., if first fetch failed but subsequent succeeded)
+             const placeholder = document.getElementById('flow-placeholder');
+             if (placeholder && initialFlowLoadComplete) placeholder.remove();
          }
 
-        // NEW function to fetch AFTERMARKET trades
+        // Fetch AFTERMARKET trades
         async function fetchAndRenderAftermarketFlow(isInitialLoad = false) {
             if (isPaused || document.hidden) return;
 
-            if (isInitialLoad && DOMElements.aftermarketOptionsTbody.children.length === 0) {
-                 const placeholder = document.createElement('tr');
-                 placeholder.id = 'aftermarket-flow-placeholder';
-                 placeholder.innerHTML = `<td colspan="5" class="text-center text-neutral-500 p-6 text-xs">Fetching after-hours trades...</td>`;
-                 DOMElements.aftermarketOptionsTbody.appendChild(placeholder);
-            }
+             if (isInitialLoad && DOMElements.aftermarketOptionsTbody.children.length === 0 && !initialAftermarketLoadComplete) {
+                  DOMElements.aftermarketOptionsTbody.innerHTML = `<tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">Monitoring after-hours trades...</td></tr>`;
+             }
 
             const newData = await fetchApi(FMP_AFTERMARKET_PROXY_URL); // Call the NEW endpoint
-            const placeholder = document.getElementById('aftermarket-flow-placeholder');
-             if (placeholder) placeholder.remove();
-
+            
             if (newData !== null) {
                 processAftermarketUpdate(newData); // Use a dedicated processing function
                  if (!initialAftermarketLoadComplete && newData.length > 0) {
@@ -926,10 +951,14 @@
                  }
             } else {
                  if (!initialAftermarketLoadComplete && DOMElements.aftermarketOptionsTbody.children.length === 0) { 
-                      DOMElements.aftermarketOptionsTbody.innerHTML = `<tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-red-400 p-6 text-xs">Failed to fetch after-hours trades. API might require a premium key.</td></tr>`;
+                     const placeholder = document.getElementById('aftermarket-flow-placeholder');
+                     if (placeholder) placeholder.innerHTML = `<td colspan="5" class="text-center text-red-400 p-6 text-xs">Failed to fetch after-hours trades. API might require a premium key.</td>`;
                  }
                  // Keep existing aftermarket data if fetch fails later
             }
+             // Ensure placeholder is removed if it wasn't already
+             const placeholder = document.getElementById('aftermarket-flow-placeholder');
+             if (placeholder && initialAftermarketLoadComplete) placeholder.remove();
         }
         
         async function fetchAndRenderNews() { 
@@ -938,23 +967,21 @@
             if(newsData) { 
                 currentNewsData = newsData; 
                 renderNewsFeed(); 
-            } 
+            } else {
+                 // Optional: Add placeholder/error to news feed if needed
+                 DOMElements.newsFeed.innerHTML = '<p class="text-center text-neutral-500 p-8 text-xs">News feed unavailable.</p>';
+            }
         }
 
         async function fetchAndRenderCrypto(isInitialLoad = false) { 
             if (isPaused || document.hidden) return;
             
-            if (isInitialLoad && DOMElements.cryptoTbody.children.length === 0) {
-                const placeholder = document.createElement('tr');
-                 placeholder.id = 'crypto-placeholder';
-                 placeholder.innerHTML = `<td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest crypto data...</td>`;
-                 DOMElements.cryptoTbody.appendChild(placeholder);
+            if (isInitialLoad && DOMElements.cryptoTbody.children.length === 0 && !initialCryptoLoadComplete) {
+                DOMElements.cryptoTbody.innerHTML = `<tr id="crypto-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest crypto data...</td></tr>`;
             }
             
             const data = await fetchCryptoFlowData(); 
-            const placeholder = document.getElementById('crypto-placeholder');
-             if (placeholder) placeholder.remove();
-
+            
             if(data) {
                 currentCryptoData = data;
                 renderCryptoFlowTable(); // This replaces innerHTML, which is fine for crypto
@@ -964,94 +991,103 @@
                      renderHeatmap();
                  }
             } else if (!initialCryptoLoadComplete && DOMElements.cryptoTbody.children.length === 0){
-                DOMElements.cryptoTbody.innerHTML = `<tr id="crypto-placeholder"><td colspan="6" class="text-center text-red-400 p-12">Could not fetch crypto data. API may be down.</td></tr>`;
+                 const placeholder = document.getElementById('crypto-placeholder');
+                 if(placeholder) placeholder.innerHTML = `<td colspan="6" class="text-center text-red-400 p-12">Could not fetch crypto data. API may be down.</td>`;
             }
+            // Ensure placeholder is removed if it wasn't already
+            const placeholder = document.getElementById('crypto-placeholder');
+            if (placeholder && initialCryptoLoadComplete) placeholder.remove();
         }
 
-        // processFlowUpdate - Handles UNUSUAL options flow (market hours)
+        // processFlowUpdate - Handles UNUSUAL options flow
          function processFlowUpdate(newData) {
-             const marketStatus = getMarketStatus();
-             
-             // If we receive an empty array:
-             if (newData.length === 0) {
-                 if (initialFlowLoadComplete) {
-                     // Market is open: API returned empty (no activity). Keep showing existing data.
-                     // Market is closed: API returned empty (as expected). Keep showing existing data.
-                     console.log("Received empty options flow update, keeping existing data.");
-                     // If the table is currently empty (e.g., filters), show "No activity"
-                     if (DOMElements.optionsTbody.children.length === 0) {
-                         DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity found for your criteria.</td></tr>`;
-                     }
-                 } else {
-                     // Initial load failed (or was empty)
-                     DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity found. Flow data appears during market hours.</td></tr>`;
-                     currentFlowData = [];
-                     displayedFlowItems = new Set([...displayedFlowItems].filter(key => !key.startsWith('main-'))); // Clear main items
+             // If we receive an empty array AFTER initial load is complete, just return (keep old data)
+             if (newData.length === 0 && initialFlowLoadComplete) {
+                 console.log("Received empty options flow update, keeping existing data.");
+                 // Ensure "No activity found for criteria" isn't stuck if filters change
+                 if (DOMElements.optionsTbody.children.length === 1 && DOMElements.optionsTbody.firstElementChild.id === 'flow-placeholder-empty') {
+                    // If the only thing is the empty message, keep it or updateFlowTable might re-add it
+                 } else if (currentFlowData.length > 0 && DOMElements.optionsTbody.children.length === 0) {
+                     // If data exists but table is empty (e.g. filters), re-render
+                     updateFlowTable();
                  }
-                 return; // Stop processing
+                 return; 
              }
-             
+              // If we receive an empty array AND initial load is NOT complete
+             if (newData.length === 0 && !initialFlowLoadComplete) {
+                 DOMElements.optionsTbody.innerHTML = `<tr id="flow-placeholder-empty"><td colspan="6" class="text-center text-neutral-500 p-12">Waiting for market activity... Check Crypto & News feeds below.</td></tr>`;
+                 currentFlowData = []; // Reset data
+                 displayedFlowItems = new Set([...displayedFlowItems].filter(key => !key.startsWith('main-')));
+                 return;
+             }
+
              // If we have new data:
              const newTrades = [];
-             for (let i = newData.length - 1; i >= 0; i--) { // Iterate backwards to prepend correctly
+             for (let i = newData.length - 1; i >= 0; i--) { // Iterate backwards
                  const item = newData[i];
-                 const tradeKey = `main-${item.timestamp}-${item.symbol}-${item.strikePrice}-${item.putCall}-${item.totalValue}`; // Prefix to distinguish
+                 // Ensure essential properties exist before creating key
+                 if (item.timestamp === undefined || item.symbol === undefined || item.strikePrice === undefined || item.putCall === undefined || item.totalValue === undefined) {
+                     console.warn("Skipping incomplete flow item:", item);
+                     continue;
+                 }
+                 const tradeKey = `main-${item.timestamp}-${item.symbol}-${item.strikePrice}-${item.putCall}-${item.totalValue}`; 
                  if (!displayedFlowItems.has(tradeKey)) {
                      newTrades.push(item);
                      displayedFlowItems.add(tradeKey);
                  }
              }
 
-             // If it's the very first load with data (or table is empty)
-             if (!initialFlowLoadComplete || DOMElements.optionsTbody.children.length === 0) {
+             // If it's the very first load with data (or table was previously empty)
+             if (!initialFlowLoadComplete || DOMElements.optionsTbody.children.length === 0 || (DOMElements.optionsTbody.children.length === 1 && DOMElements.optionsTbody.firstElementChild.id.startsWith('flow-placeholder'))) {
                   currentFlowData = newData.sort((a,b) => b.timestamp - a.timestamp); 
                   updateFlowTable(); // Full re-render with filters/sort
-                  if (newData.length > 0) initialFlowLoadComplete = true;
+                  if (newData.length > 0) initialFlowLoadComplete = true; // Mark complete
                   return;
              }
              
              // If we have new trades to add to the existing list
              if (newTrades.length > 0) {
-                 // We must filter/sort the new trades *before* prepending
-                 // Easiest way: add to main data, then call updateFlowTable
+                 // Add new trades to the beginning of the main data array
                  currentFlowData.unshift(...newTrades);
-                 updateFlowTable(); // This will re-render the whole table, but respect filters/sort
-
-                 // This smooth-prepending logic is complex with filters/sort
-                 // Re-rendering (updateFlowTable) is safer
-                 /*
-                 newTrades.forEach(item => {
-                    const row = createFlowRowElement(item);
-                    DOMElements.optionsTbody.prepend(row);
-                    currentFlowData.unshift(item); 
-                 });
-                 // Pruning logic...
-                 while (DOMElements.optionsTbody.children.length > MAX_FLOW_ROWS) { ... }
+                  // Ensure main data array doesn't grow indefinitely
                  currentFlowData.length = Math.min(currentFlowData.length, MAX_FLOW_ROWS + 50); 
-                 */
+                 
+                 // Re-render the table with filters and sort applied
+                 updateFlowTable(); 
+             } else {
+                 // No new trades, but check if filters/sort might need applying to existing data
+                 // (e.g., if user changed filter while data hasn't updated)
+                 // updateFlowTable(); // Potentially re-render to ensure consistency - might cause flicker
              }
          }
          
-         // NEW function to handle smooth AFTERMARKET flow updates
+         // Handle AFTERMARKET flow updates
          function processAftermarketUpdate(newData) {
+              // If empty array received
               if (newData.length === 0) {
-                 if (initialAftermarketLoadComplete) {
-                     console.log("Received empty aftermarket update, keeping existing data.");
-                      if (DOMElements.aftermarketOptionsTbody.children.length === 0) {
-                         DOMElements.aftermarketOptionsTbody.innerHTML = `<tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">No recent after-hours trades found for monitored tickers.</td></tr>`;
-                      }
-                 } else {
-                    DOMElements.aftermarketOptionsTbody.innerHTML = `<tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">No recent after-hours trades found for monitored tickers.</td></tr>`;
+                 // Keep existing data if already loaded, otherwise show monitoring message
+                 if (!initialAftermarketLoadComplete) {
+                    DOMElements.aftermarketOptionsTbody.innerHTML = `<tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">Monitoring after-hours trades...</td></tr>`;
                     currentAftermarketData = [];
-                    displayedFlowItems = new Set([...displayedFlowItems].filter(key => !key.startsWith('ah-'))); // Clear AH items
+                    displayedFlowItems = new Set([...displayedFlowItems].filter(key => !key.startsWith('ah-')));
+                 } else if (DOMElements.aftermarketOptionsTbody.children.length === 0) {
+                     // If table somehow became empty after initial load
+                      DOMElements.aftermarketOptionsTbody.innerHTML = `<tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">No recent after-hours trades detected.</td></tr>`;
                  }
+                  // If data exists, just leave it.
+                 console.log("Received empty aftermarket update.");
                  return;
               }
 
-
+             // Process new trades
              const newTrades = [];
              for (let i = newData.length - 1; i >= 0; i--) { // Iterate backwards
                  const item = newData[i];
+                  // Ensure essential properties exist for aftermarket key
+                 if (item.timestamp === undefined || item.symbol === undefined || item.tradePrice === undefined || item.tradeSize === undefined) {
+                     console.warn("Skipping incomplete aftermarket item:", item);
+                     continue;
+                 }
                  const tradeKey = `ah-${item.timestamp}-${item.symbol}-${item.tradePrice}-${item.tradeSize}`; 
                  if (!displayedFlowItems.has(tradeKey)) {
                      newTrades.push(item);
@@ -1059,29 +1095,33 @@
                  }
              }
 
-             if (!initialAftermarketLoadComplete || DOMElements.aftermarketOptionsTbody.children.length === 0) {
+             // Initial load with data or table was empty
+             if (!initialAftermarketLoadComplete || DOMElements.aftermarketOptionsTbody.children.length === 0 || (DOMElements.aftermarketOptionsTbody.children.length === 1 && DOMElements.aftermarketOptionsTbody.firstElementChild.id === 'aftermarket-flow-placeholder')) {
                   currentAftermarketData = newData.sort((a,b) => b.timestamp - a.timestamp); 
-                  renderAftermarketTable(); // Use a dedicated render function
-                  if (newData.length > 0) initialAftermarketLoadComplete = true;
+                  renderAftermarketTable(); 
+                  if (newData.length > 0) initialAftermarketLoadComplete = true; // Mark complete
                   return;
              }
 
+             // Prepend new trades smoothly
              if (newTrades.length > 0) {
                  newTrades.forEach(item => {
                     const row = createAftermarketRowElement(item);
+                     row.classList.add('fade-in-down'); // Add animation here for smooth prepend
                     DOMElements.aftermarketOptionsTbody.prepend(row);
                     currentAftermarketData.unshift(item); 
                  });
 
-                 // Prune aftermarket table
+                 // Prune aftermarket table visually
                  while (DOMElements.aftermarketOptionsTbody.children.length > MAX_AFTERMARKET_ROWS) {
                      const oldestRowElement = DOMElements.aftermarketOptionsTbody.lastElementChild;
-                     if (oldestRowElement) {
+                     if (oldestRowElement && !oldestRowElement.id?.includes('placeholder')) { // Don't remove placeholder if it's the only thing left
                          const oldestKey = oldestRowElement.dataset.key; 
                          if(oldestKey) displayedFlowItems.delete(oldestKey);
                          oldestRowElement.remove();
                      } else { break; }
                  }
+                  // Prune aftermarket data array
                  currentAftermarketData.length = Math.min(currentAftermarketData.length, MAX_AFTERMARKET_ROWS + 20);
              }
          }
@@ -1090,10 +1130,15 @@
         // createFlowRowElement - For UNUSUAL options flow
         function createFlowRowElement(item) {
             const row = document.createElement('tr');
+            // Ensure essential properties exist before creating key
+            if (item.timestamp === undefined || item.symbol === undefined || item.strikePrice === undefined || item.putCall === undefined || item.totalValue === undefined) {
+                console.warn("Cannot create row for incomplete flow item:", item);
+                return null; // Return null if data is incomplete
+            }
             const tradeKey = `main-${item.timestamp}-${item.symbol}-${item.strikePrice}-${item.putCall}-${item.totalValue}`; // Prefix key
             row.dataset.key = tradeKey;
             row.dataset.ticker = item.symbol;
-            row.className = `cursor-pointer hover:bg-neutral-800/50 ${item.putCall === 'CALL' ? 'call-row' : 'put-row'}`; // Remove fade-in-down here, apply in updateFlowTable if needed
+            row.className = `cursor-pointer hover:bg-neutral-800/50 ${item.putCall === 'CALL' ? 'call-row' : 'put-row'}`; 
             row.innerHTML = `
                 <td class="p-2 text-neutral-400">${new Date(item.timestamp * 1000).toLocaleTimeString()}</td>
                 <td class="p-2 font-semibold text-white">${item.symbol}</td>
@@ -1113,10 +1158,16 @@
             return row;
         }
         
-        // NEW helper to create a single AFTERMARKET flow row element
+        // Helper to create a single AFTERMARKET flow row element
         function createAftermarketRowElement(item) {
              const row = document.createElement('tr');
+              // Ensure essential properties exist for aftermarket key
+             if (item.timestamp === undefined || item.symbol === undefined || item.tradePrice === undefined || item.tradeSize === undefined) {
+                 console.warn("Cannot create row for incomplete aftermarket item:", item);
+                 return null; // Return null if data is incomplete
+             }
              const tradeKey = `ah-${item.timestamp}-${item.symbol}-${item.tradePrice}-${item.tradeSize}`; // Aftermarket key
+             const premium = (item.tradePrice * item.tradeSize * 100); // Calculate premium
              row.dataset.key = tradeKey;
              row.dataset.ticker = item.symbol; // Allow clicking ticker
              row.className = `cursor-pointer hover:bg-neutral-800/50 text-xs`; // Smaller text
@@ -1125,9 +1176,8 @@
                  <td class="p-1.5 font-semibold text-white">${item.symbol}</td>
                  <td class="p-1.5 text-right font-mono">${item.tradePrice ? item.tradePrice.toFixed(2) : 'N/A'}</td>
                  <td class="p-1.5 text-right font-mono">${item.tradeSize || 'N/A'}</td>
-                 <td class="p-1.5 text-right font-mono ${getPremiumColor(item.totalValue)}">${formatCurrency(item.totalValue)}</td>
+                 <td class="p-1.5 text-right font-mono ${getPremiumColor(premium)}">${formatCurrency(premium)}</td> <!-- Display calculated premium -->
              `;
-             // Note: No Strike/Type/Sentiment/Vol/OI easily available in raw after-hours trades
              return row;
          }
 
@@ -1135,34 +1185,39 @@
         function updateFlowTable() {
              const filteredData = getFilteredAndSortedData(); 
 
-             DOMElements.optionsTbody.innerHTML = ''; 
+             DOMElements.optionsTbody.innerHTML = ''; // Clear previous content
              
              // Clear only main flow items from tracking set
              displayedFlowItems = new Set([...displayedFlowItems].filter(key => !key.startsWith('main-')));
 
-
              if (filteredData.length === 0) {
-                  // Only show this message if the initial load was complete OR market is open
-                  if(initialFlowLoadComplete || getMarketStatus().isOpen) {
-                     DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity found for your criteria.</td></tr>`; 
-                  } else if (!initialFlowLoadComplete) {
-                     // If initial load hasn't happened and market is closed, show initializing
-                      DOMElements.optionsTbody.innerHTML = `<tr id="flow-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Initializing flow... (Market Closed)</td></tr>`;
-                  }
+                 // Refined empty state message
+                 if (initialFlowLoadComplete) {
+                    DOMElements.optionsTbody.innerHTML = `<tr id="flow-placeholder-empty"><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity currently matches your criteria.</td></tr>`; 
+                 } else {
+                    DOMElements.optionsTbody.innerHTML = `<tr id="flow-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest market activity... Check Crypto & News feeds below.</td></tr>`;
+                 }
                  return; 
              }
 
-             // Add fade-in only for the first row to simulate smooth update
+             // Add fade-in only for the first N rows (e.g., first 10) for visual cue
              filteredData.forEach((item, index) => {
                  const row = createFlowRowElement(item);
-                 if (index === 0) row.classList.add('fade-in-down'); // Add animation to top row
-                 const tradeKey = `main-${item.timestamp}-${item.symbol}-${item.strikePrice}-${item.putCall}-${item.totalValue}`;
-                 displayedFlowItems.add(tradeKey); 
-                 DOMElements.optionsTbody.appendChild(row);
+                 if (row) { // Check if row creation was successful
+                     if (index < 10) row.classList.add('fade-in-down'); // Animate first few rows
+                     const tradeKey = `main-${item.timestamp}-${item.symbol}-${item.strikePrice}-${item.putCall}-${item.totalValue}`;
+                     displayedFlowItems.add(tradeKey); 
+                     DOMElements.optionsTbody.appendChild(row);
+                 }
              });
+             // Remove placeholder if it somehow persists
+             const placeholder = document.getElementById('flow-placeholder');
+             if (placeholder) placeholder.remove();
+             const placeholderEmpty = document.getElementById('flow-placeholder-empty');
+             if(placeholderEmpty) placeholderEmpty.remove();
          }
          
-         // NEW function to render the AFTERMARKET table from currentAftermarketData
+         // Render the AFTERMARKET table from currentAftermarketData
          function renderAftermarketTable() {
               const dataToRender = currentAftermarketData.sort((a,b) => b.timestamp - a.timestamp).slice(0, MAX_AFTERMARKET_ROWS);
 
@@ -1173,17 +1228,22 @@
 
 
               if (dataToRender.length === 0) {
-                   DOMElements.aftermarketOptionsTbody.innerHTML = `<tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">No recent after-hours trades found for monitored tickers.</td></tr>`;
+                   DOMElements.aftermarketOptionsTbody.innerHTML = `<tr id="aftermarket-flow-placeholder"><td colspan="5" class="text-center text-neutral-500 p-6 text-xs">Monitoring after-hours trades...</td></tr>`; // Persistent monitoring message
                    return;
               }
 
               dataToRender.forEach(item => {
                   const row = createAftermarketRowElement(item);
-                  row.classList.remove('fade-in-down'); 
-                  const tradeKey = `ah-${item.timestamp}-${item.symbol}-${item.tradePrice}-${item.tradeSize}`;
-                  displayedFlowItems.add(tradeKey);
-                  DOMElements.aftermarketOptionsTbody.appendChild(row);
+                   if (row) { // Check if row creation was successful
+                        row.classList.remove('fade-in-down'); 
+                        const tradeKey = `ah-${item.timestamp}-${item.symbol}-${item.tradePrice}-${item.tradeSize}`;
+                        displayedFlowItems.add(tradeKey);
+                        DOMElements.aftermarketOptionsTbody.appendChild(row);
+                   }
               });
+              // Remove placeholder if it somehow persists
+              const placeholder = document.getElementById('aftermarket-flow-placeholder');
+             if (placeholder) placeholder.remove();
          }
         
         function renderNewsFeed() {
@@ -1193,13 +1253,22 @@
 
        function renderCryptoFlowTable() {
             if (!currentCryptoData || currentCryptoData.length === 0) {
-                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Could not fetch crypto data.</td></tr>`;
+                 if(initialCryptoLoadComplete){
+                    DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No crypto data currently available.</td></tr>`;
+                 } else {
+                    DOMElements.cryptoTbody.innerHTML = `<tr id="crypto-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Fetching crypto data...</td></tr>`;
+                 }
                 return;
             }
             DOMElements.cryptoTbody.innerHTML = currentCryptoData.map(crypto => {
                 const quote = crypto.quote.USD;
-                const change1h = quote.percent_change_1h;
-                const change24h = quote.percent_change_24h;
+                // Handle potential missing quote data gracefully
+                if (!quote) return ''; 
+                const change1h = quote.percent_change_1h ?? 0; // Use nullish coalescing for defaults
+                const change24h = quote.percent_change_24h ?? 0;
+                const price = quote.price ?? 0;
+                const volume24h = quote.volume_24h ?? 0;
+                const marketCap = quote.market_cap ?? 0;
                 const color1h = change1h >= 0 ? 'text-green-400' : 'text-red-400';
                 const color24h = change24h >= 0 ? 'text-green-400' : 'text-red-400';
                 return `
@@ -1208,13 +1277,16 @@
                             <div class="font-semibold text-white">${crypto.name}</div>
                             <div class="text-neutral-400">${crypto.symbol}</div>
                         </td>
-                        <td class="p-2 text-right font-mono">${quote.price < 0.01 ? '$' + quote.price.toFixed(6) : '$' + quote.price.toFixed(2)}</td>
+                        <td class="p-2 text-right font-mono">${price < 0.01 ? '$' + price.toFixed(6) : '$' + price.toFixed(2)}</td>
                         <td class="p-2 text-right font-mono ${color1h}">${change1h.toFixed(2)}%</td>
                         <td class="p-2 text-right font-mono ${color24h}">${change24h.toFixed(2)}%</td>
-                        <td class="p-2 text-right font-mono">${formatCurrency(quote.volume_24h)}</td>
-                        <td class="p-2 text-right font-mono">${formatCurrency(quote.market_cap)}</td>
+                        <td class="p-2 text-right font-mono">${formatCurrency(volume24h)}</td>
+                        <td class="p-2 text-right font-mono">${formatCurrency(marketCap)}</td>
                     </tr>`;
             }).join('');
+             // Remove placeholder if it somehow persists
+             const placeholder = document.getElementById('crypto-placeholder');
+             if (placeholder) placeholder.remove();
         }
 
         // getFilteredAndSortedData - Operates on currentFlowData (MAIN unusual flow)
@@ -1251,11 +1323,13 @@
                         errorBody = await rClone.text(); 
                     }
                     
-                    let friendlyMessage = `API ERROR: ${r.statusText}. Check console for details.`;
+                    let friendlyMessage = `API ERROR: ${r.statusText}. Check console.`;
                     if (r.status === 404) {
-                        friendlyMessage = `API FUNCTION NOT FOUND (404). Ensure file structure is netlify/functions/YOUR-FILE.js`;
+                        friendlyMessage = `API Function Not Found (404). Check Netlify setup.`;
                     } else if (r.status === 500) {
-                        friendlyMessage = `API FUNCTION ERROR (500). Check function logs in Netlify. Is API key correct?`;
+                        friendlyMessage = `API Function Error (500). Check Netlify logs & API Key.`;
+                    } else if (r.status === 402 || r.status === 403) {
+                         friendlyMessage = `API Access Denied (${r.status}). Check API Key/Plan.`;
                     }
 
                     console.error(`API Error: ${r.status} ${r.statusText} for ${url}`, errorBody);
@@ -1285,78 +1359,77 @@
             if (!stripe) { showAlertBanner("Stripe is not configured. Please add a valid publishable key."); return; }
             if (!priceId || priceId.includes('YOUR_')) { showAlertBanner("This plan's checkout is not configured yet."); return; }
             showAlertBanner(`Redirecting to Stripe for plan with Price ID: ${priceId}`);
+            // Add actual Stripe redirect logic here if configured
         }
         
         // --- Utilities ---
-        function getMarketStatus() { const now = new Date(); const nowET = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' })); const day = nowET.getDay(); const hour = nowET.getHours(); const minute = nowET.getMinutes(); const isWeekday = day >= 1 && day <= 5; const marketTime = hour * 60 + minute; const openTime = 9 * 60 + 30; const closeTime = 16 * 60; if (isWeekday && marketTime >= openTime && marketTime < closeTime) { return { isOpen: true, nextEvent: 'close', time: (closeTime - marketTime) * 60 }; } let nextOpenDayIndex = (day === 5 && marketTime >= closeTime) ? 1 : (day === 6 ? 1 : (day === 0 ? 1 : (marketTime < openTime ? day : day + 1))); if(nextOpenDayIndex > 5) nextOpenDayIndex = 1; let daysUntilOpen = (nextOpenDayIndex - day + 7) % 7; if (daysUntilOpen === 0 && marketTime >= closeTime) { daysUntilOpen = day === 5 ? 3 : 1; } let nextOpen = new Date(nowET); nextOpen.setDate(nowET.getDate() + daysUntilOpen); nextOpen.setHours(9, 30, 0, 0); return { isOpen: false, nextEvent: 'open', time: nextOpen.getTime() - nowET.getTime() }; }
-        
-        // updateMarketCountdown - MODIFIED to handle interval switching and UI visibility
-        function updateMarketCountdown() {
-             const status = getMarketStatus();
-             if (status.isOpen) {
-                 // Market OPEN logic
-                 const seconds = status.time; 
-                 const minutes = Math.floor(seconds / 60); 
-                 const hours = Math.floor(minutes / 60); 
-                 const remainingMinutes = minutes % 60; 
-                 DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div><span class="font-semibold text-green-400">Market Open</span><span class="text-neutral-400">| Closes in ${hours}h ${remainingMinutes}m</span></div>`; 
-                 
-                 // If aftermarket interval is running, stop it and hide the section
-                 if (aftermarketFlowInterval) {
-                     console.log("Market opened, stopping aftermarket flow fetch.");
-                     clearInterval(aftermarketFlowInterval);
-                     aftermarketFlowInterval = null;
-                     DOMElements.aftermarketFlowView.classList.add('hidden');
-                 }
-                 // Start main flow interval if it's not running
-                 if (!flowInterval && currentUserData && currentUserData.plan !== 'free') {
-                     console.log("Market open, starting main flow fetch.");
-                     fetchAndRenderFlow(null, !initialFlowLoadComplete); // Fetch immediately if needed
-                     flowInterval = setInterval(() => fetchAndRenderFlow(null, false), 90000);
-                 }
-
-             } else {
-                 // Market CLOSED logic
-                  const ms = status.time; 
-                  const days = Math.floor(ms / (1000 * 60 * 60 * 24)); 
-                  const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)); 
-                  const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60)); 
-                  const seconds = Math.floor((ms % (1000 * 60)) / 1000); 
-                 DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-red-500 rounded-full"></div><span class="font-semibold text-red-400">Market Closed</span><span class="text-neutral-400">| Opens in ${days}d ${hours}h ${minutes}m ${seconds}s</span></div>`; 
-
-                 // If main flow interval is running, stop it
-                 if (flowInterval) {
-                     console.log("Market closed, stopping main flow fetch.");
-                     clearInterval(flowInterval);
-                     flowInterval = null;
-                      // Display persisted main flow data if available
-                     if(currentFlowData.length > 0) {
-                        updateFlowTable(); // Ensure correct filters/sort applied to persisted data
-                     } else if (!initialFlowLoadComplete){
-                         DOMElements.optionsTbody.innerHTML = `<tr id="flow-placeholder"><td colspan="6" class="text-center text-neutral-500 p-12">Market Closed. Waiting for initial data...</td></tr>`;
-                     } else {
-                         DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Market Closed. No unusual activity found for your criteria.</td></tr>`; 
-                     }
-                 }
-                  // Start aftermarket interval if it's not running
-                 if (!aftermarketFlowInterval && currentUserData && currentUserData.plan !== 'free') {
-                     console.log("Market closed, starting aftermarket flow fetch.");
-                     DOMElements.aftermarketFlowView.classList.remove('hidden'); // Show the section
-                     fetchAndRenderAftermarketFlow(!initialAftermarketLoadComplete); // Fetch immediately
-                     aftermarketFlowInterval = setInterval(() => fetchAndRenderAftermarketFlow(false), 180000); // 3 mins
-                 }
-             } 
-         }
-
         const formatCurrency = (v) => v >= 1000000000 ? `$${(v/1000000000).toFixed(2)}b` : (v >= 1000000 ? `$${(v/1000000).toFixed(2)}m` : (v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v.toFixed(0)}`));
         const getPremiumColor = (p) => p > 250000 ? 'text-orange-400' : (p > 100000 ? 'text-yellow-400' : '');
         const timeAgo = (iso) => { if (!iso) return ''; const s = Math.floor((new Date() - new Date(iso)) / 1000); if (s < 0) return 'just now'; let i = s / 31536000; if (i > 1) return `${Math.floor(i)}y ago`; i = s / 2592000; if (i > 1) return `${Math.floor(i)}mo ago`; i = s / 86400; if (i > 1) return `${Math.floor(i)}d ago`; i = s / 3600; if (i > 1) return `${Math.floor(i)}h ago`; i = s / 60; if (i > 1) return `${Math.floor(i)}m ago`; return `${Math.floor(s)}s ago`; };
         const getFriendlyAuthError = (err) => { switch (err.code) { case 'auth/user-not-found': case 'auth/wrong-password': return 'Invalid email or password.'; case 'auth/email-already-in-use': return 'An account with this email already exists.'; case 'auth/popup-closed-by-user': return 'Sign-in window closed. Please try again.'; case 'auth/internal-error': return 'An internal authentication error occurred. Please try again later.' ; default: console.error("Authentication Error:", err); return 'An unexpected error occurred. Please try again.'; } };
-        const togglePause = () => { isPaused = !isPaused; DOMElements.pausePlayBtn.innerHTML = isPaused ? '<i data-lucide="play-circle" class="w-4 h-4"></i><span>Resume</span>' : '<i data-lucide="pause-circle" class="w-4 h-4"></i><span>Pause</span>'; lucide.createIcons(); };
+        const togglePause = () => { isPaused = !isPaused; DOMElements.pausePlayBtn.innerHTML = isPaused ? '<i data-lucide="play-circle" class="w-4 h-4"></i><span>Resume</span>' : '<i data-lucide="pause-circle" class="w-4 h-4"></i><span>Pause</span>'; lucide.createIcons(); if(!isPaused) startDataFetching(); else stopDataFetching(); }; // Restart/Stop fetches on pause/resume
         const showAlertBanner = (msg) => { const banner = document.createElement('div'); banner.className = 'alert-banner bg-orange-500 text-white font-bold p-3 rounded-lg shadow-lg mb-2 flex items-center justify-between'; banner.innerHTML = `<span>${msg}</span><button class="ml-4 text-white/80 hover:text-white">&times;</button>`; DOMElements.alertBannerContainer.prepend(banner); banner.querySelector('button').addEventListener('click', () => banner.remove()); setTimeout(() => banner.remove(), 5000); };
         const showModal = (type) => { const content = { tos: { title: "Terms of Service", body: `<h4>1. Acceptance of Terms</h4><p>By accessing or using AlphaFlow, you agree to be bound by these Terms of Service...</p><h4>2. Financial Disclaimer</h4><p>AlphaFlow is a data provider and educational tool... You are solely responsible for your own investment decisions...</p>` }, privacy: { title: "Privacy Policy", body: `<h4>1. Information We Collect</h4><p>We collect information to provide and improve our Service...</p><h4>2. Use of Data</h4><p>AlphaFlow uses the collected data for various purposes...</p>`}, contact: { title: "Customer Service", body: `<h4>Contact Information</h4><p>For support, billing questions, or any other inquiries, please email our support team at: <a href="mailto:support@alphaflow.io" class="text-orange-400">support@alphaflow.io</a>.</p>` } }; DOMElements.modalTitle.textContent = content[type].title; DOMElements.modalBody.innerHTML = content[type].body.replace(/\.\.\./g, ' and other standard clauses.'); DOMElements.genericModal.classList.remove('hidden'); };
 
         // --- App Initialization ---
+        async function initializeAppAndAuth() { // Wrap in async function
+             // Get config from global scope (provided by environment)
+             const firebaseConfigString = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+             if (!firebaseConfigString) {
+                 console.error("Firebase config is missing!");
+                 showInitializationError("Firebase configuration is missing. Cannot initialize application.");
+                 return;
+             }
+             const firebaseConfig = JSON.parse(firebaseConfigString);
+             
+             app = initializeApp(firebaseConfig);
+             auth = getAuth(app);
+             db = getFirestore(app);
+             setLogLevel('debug'); // Enable Firestore debug logging
+
+            // Get initial auth token and sign in
+             const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+             try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                    console.log("Signed in with custom token.");
+                } else {
+                    console.warn("No initial auth token found, signing in anonymously.");
+                    await signInAnonymously(auth);
+                }
+             } catch (error) {
+                 console.error("Firebase sign-in error:", error);
+                 showInitializationError(`Firebase sign-in failed: ${error.message}`);
+                 return; // Stop initialization if sign-in fails
+             }
+
+
+             // Safely initialize Stripe
+             if (STRIPE_PUBLISHABLE_KEY && STRIPE_PUBLISHABLE_KEY !== 'YOUR_STRIPE_PUBLISHABLE_KEY') {
+                 stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+             } else {
+                 console.warn("Stripe key is a placeholder. Payment functionality will be disabled.");
+             }
+                
+             // Setup Listeners
+             setupAuthListeners(); 
+             setupEventListeners(); 
+             lucide.createIcons(); 
+                
+             // Auth State Change Listener (handles subsequent changes and initial load after sign-in)
+             onAuthStateChanged(auth, user => { 
+                 console.log("Auth state changed:", user ? user.uid : 'No user');
+                 authReady = true; 
+                 currentUser = user; 
+                 if (user) { 
+                     loadUserData(user); 
+                 } else { 
+                     handleSignedOutState(); 
+                 } 
+             });
+        }
+
+
         document.addEventListener('DOMContentLoaded', () => {
             DOMElements = Object.fromEntries(Array.from(document.querySelectorAll('[id]')).map(el => [el.id.replace(/-(\w)/g, (m, g) => g.toUpperCase()), el]));
             // Add new DOM elements for aftermarket view
@@ -1365,41 +1438,12 @@
 
             DOMElements.pages = { dashboard: DOMElements.dashboardPage, plans: DOMElements.plansPage, account: DOMElements.accountPage, backtester: DOMElements.backtesterPage, chart: DOMElements.chartPage };
 
-            try {
-                // Initialize Firebase
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-                setLogLevel('debug'); // Enable Firestore debug logging
-
-                // Safely initialize Stripe
-                if (STRIPE_PUBLISHABLE_KEY && STRIPE_PUBLISHABLE_KEY !== 'YOUR_STRIPE_PUBLISHABLE_KEY') {
-                    stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
-                } else {
-                    console.warn("Stripe key is a placeholder. Payment functionality will be disabled.");
-                }
-                
-                // Setup Listeners
-                setupAuthListeners(); 
-                setupEventListeners(); 
-                lucide.createIcons(); 
-                
-                // Auth State Change Listener
-                onAuthStateChanged(auth, user => { 
-                    authReady = true; 
-                    currentUser = user; 
-                    if (user) { 
-                        loadUserData(user); 
-                    } else { 
-                        handleSignedOutState(); 
-                    } 
-                });
-
-            } catch(e) {
-                console.error("Critical Firebase Initialization Error:", e);
-                showInitializationError(`Failed to initialize Firebase: ${e.message}. Ensure your firebaseConfig object in index.html is correct.`);
-            }
+            initializeAppAndAuth().catch(e => { // Call async init function
+                 console.error("Critical Initialization Error:", e);
+                 showInitializationError(`Failed to initialize application: ${e.message}`);
+            });
         });
     </script>
 </body>
 </html>
+
