@@ -31,7 +31,7 @@
         ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #52525b; }
         .sticky-header { position: sticky; top: 0; z-index: 10; }
-        .control-button.active, .view-button.active { background-color: #ea580c; color: #ffffff; }
+        .control-button.active, .view-button.active, .tab-button.active { background-color: #ea580c; color: #ffffff; } /* Added .tab-button */
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .fade-in { animation: fadeIn 0.5s ease-out forwards; }
         .custom-select {
@@ -51,6 +51,10 @@
         .prose-invert a:hover { color: #fdba74; }
         .call-row { border-left: 3px solid #22c55e; }
         .put-row { border-left: 3px solid #ef4444; }
+        /* Added for new modules */
+        .sidebar-module { max-height: 300px; overflow-y: auto; }
+        .sidebar-ticker { transition: background-color 0.2s ease; }
+        .sidebar-ticker:hover { background-color: #3f3f46; }
     </style>
 </head>
 <body class="text-sm">
@@ -136,9 +140,32 @@
                     </div>
                     <div class="col-span-1 bg-neutral-900 rounded-lg shadow-lg flex flex-col h-[calc(100vh-140px)]">
                         <div class="flex-grow overflow-y-auto p-3 space-y-4">
-                            <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Watchlist</h2><div class="flex gap-2 mb-3"><input type="text" id="watchlist-input" placeholder="Add Ticker..." class="bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs"><button id="add-watchlist-btn" class="bg-orange-600 hover:bg-orange-500 text-white font-semibold px-3 py-1.5 rounded-md transition-colors text-xs">Add</button></div><div id="watchlist-container" class="space-y-2"></div></div>
-                            <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Alerts</h2><div class="space-y-2 mb-3"><input type="text" id="alert-ticker-input" placeholder="Ticker" class="bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs"><select id="alert-premium-select" class="custom-select bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"><option value="50000">Premium > $50k</option><option value="100000">Premium > $100k</option><option value="250000">Premium > $250k</option><option value="500000">Premium > $500k</option></select></div><button id="add-alert-btn" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold px-3 py-1.5 rounded-md transition-colors text-xs">Add Alert</button><div id="alerts-container" class="space-y-2 mt-3"></div></div>
-                            <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Market News</h2><div id="news-feed" class="space-y-3"></div></div>
+                            <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Watchlist</h2><div class="flex gap-2 mb-3"><input type="text" id="watchlist-input" placeholder="Add Ticker..." class="bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs"><button id="add-watchlist-btn" class="bg-orange-600 hover:bg-orange-500 text-white font-semibold px-3 py-1.5 rounded-md transition-colors text-xs">Add</button></div><div id="watchlist-container" class="space-y-2 sidebar-module"></div></div>
+                            <!-- === NEW MARKET MOVERS MODULE === -->
+                            <div>
+                                <h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Market Movers</h2>
+                                <div class="flex items-center gap-1 p-1 bg-neutral-800/50 rounded-md mb-3">
+                                    <button id="gainers-tab-btn" class="tab-button active flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">Gainers</button>
+                                    <button id="losers-tab-btn" class="tab-button flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">Losers</button>
+                                </div>
+                                <div id="gainers-view" class="space-y-2 sidebar-module">
+                                    <!-- Gainers will be loaded here -->
+                                </div>
+                                <div id="losers-view" class="hidden space-y-2 sidebar-module">
+                                    <!-- Losers will be loaded here -->
+                                </div>
+                            </div>
+                            <!-- === END NEW MODULE === -->
+                            <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Alerts</h2><div class="space-y-2 mb-3"><input type="text" id="alert-ticker-input" placeholder="Ticker" class="bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs"><select id="alert-premium-select" class="custom-select bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"><option value="50000">Premium > $50k</option><option value="100000">Premium > $100k</option><option value="250000">Premium > $250k</option><option value="500000">Premium > $500k</option></select></div><button id="add-alert-btn" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold px-3 py-1.5 rounded-md transition-colors text-xs">Add Alert</button><div id="alerts-container" class="space-y-2 mt-3 sidebar-module"></div></div>
+                            <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Market News</h2><div id="news-feed" class="space-y-3 sidebar-module"></div></div>
+                            <!-- === NEW SECTOR PERFORMANCE MODULE === -->
+                            <div>
+                                <h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Sector Performance</h2>
+                                <div id="sector-performance-container" class="space-y-2 sidebar-module">
+                                    <!-- Sector performance will be loaded here -->
+                                </div>
+                            </div>
+                            <!-- === END NEW MODULE === -->
                         </div>
                         <div class="p-3" id="ad-container"><div class="h-48 bg-neutral-800/50 rounded-lg flex flex-col p-4 border border-neutral-700 text-center justify-center"><p class="text-neutral-500 text-xs">A professional, ad-free experience is available on our Pro & Elite plans.</p><button id="sidebar-upgrade-btn" class="mt-4 text-sm font-medium bg-orange-600 px-3 py-1.5 rounded-md hover:bg-orange-500 transition-colors">Upgrade Now</button></div></div>
                     </div>
@@ -183,13 +210,37 @@
                     </div>
                 </div>
             </div>
+             <!-- === MODIFIED CHART PAGE TO TICKER DETAIL PAGE === -->
              <div id="chart-page" class="hidden page-container absolute inset-0 bg-neutral-950 z-30 p-4">
                  <div class="bg-neutral-900 rounded-lg shadow-lg flex flex-col w-full h-full p-3">
-                     <div class="flex items-center justify-between pb-2 border-b border-neutral-800 mb-2">
+                     <div class="flex items-center justify-between pb-3 border-b border-neutral-800 mb-3">
                         <button id="back-to-dashboard-chart" class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 transition-colors"><i data-lucide="arrow-left" class="w-4 h-4"></i><span>Back</span></button>
-                        <h2 id="chart-ticker-title" class="text-xl font-bold text-white"></h2><div></div>
+                        <h2 id="chart-ticker-symbol" class="text-2xl font-bold text-white"></h2>
+                        <div class="w-20"></div> <!-- Spacer -->
                     </div>
-                    <div id="tradingview-widget-container" class="flex-grow w-full"></div>
+                    
+                    <!-- New Profile Section -->
+                    <div id="ticker-profile-container" class="flex-shrink-0 p-3 space-y-3">
+                        <div class="flex items-center justify-between gap-4">
+                            <div class="flex items-center gap-4">
+                                <img id="ticker-profile-image" src="" alt="Logo" class="w-16 h-16 rounded-full bg-neutral-800" onerror="this.src='https://placehold.co/64x64/3f3f46/9ca3af?text=N/A'; this.onerror=null;">
+                                <div>
+                                    <h3 id="ticker-profile-name" class="text-2xl font-bold text-white"></h3>
+                                    <a id="ticker-profile-website" href="#" target="_blank" rel="noopener noreferrer" class="text-sm text-orange-400 hover:underline"></a>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <h3 id="ticker-profile-price" class="text-3xl font-bold text-white"></h3>
+                                <div id="ticker-profile-change" class="text-lg font-semibold"></div>
+                            </div>
+                        </div>
+                        <p id="ticker-profile-description" class="text-sm text-neutral-400 max-h-24 overflow-y-auto"></p>
+                    </div>
+                    
+                    <!-- TradingView Widget -->
+                    <div id="tradingview-widget-container" class="flex-grow w-full min-h-[300px]">
+                        <!-- Widget loads here -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -237,9 +288,6 @@
     <script type="module" defer>
         // Firebase Imports (v11.6.1)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // --- FIX APPLIED ---
-        // Corrected the typo below. It was 'httpsq://' and is now 'https://'
-        // This was blocking Firebase Auth from loading and causing the app to hang on the loading screen.
         import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
@@ -260,12 +308,17 @@
         const CMC_PROXY_URL = '/.netlify/functions/crypto';
         const FMP_PROXY_URL = '/.netlify/functions/options-flow';
         const NEWS_PROXY_URL = '/.netlify/functions/news';
+        // === NEW FUNCTION ENDPOINTS ===
+        const MOVERS_PROXY_URL = '/.netlify/functions/market-movers';
+        const SECTORS_PROXY_URL = '/.netlify/functions/sector-performance';
+        const PROFILE_PROXY_URL = '/.netlify/functions/company-profile';
+
 
         // --- App State ---
         let app, auth, db;
         let stripe;
-        let flowInterval, newsInterval, cryptoInterval, dbUnsubscribe, marketCountdownInterval;
-        let currentFlowData = [], currentNewsData = [], currentCryptoData = [];
+        let flowInterval, newsInterval, cryptoInterval, moversInterval, sectorsInterval, dbUnsubscribe, marketCountdownInterval;
+        let currentFlowData = [], currentNewsData = [], currentCryptoData = [], currentMoversData = { gainers: [], losers: [] }, currentSectorsData = [];
         let userWatchlist = new Set(), userAlerts = [];
         let isPaused = false;
         let activeFilter = 'all', activeSort = 'timestamp-desc', activePremiumFilter = 0;
@@ -449,6 +502,32 @@
             DOMElements.adminPlanSelector.addEventListener('change', () => { updateUIForPlan(); renderHeader(); });
             DOMElements.manageBillingBtn.addEventListener('click', () => showAlertBanner('Billing portal integration is required.'));
             DOMElements.cancelSubscriptionBtn.addEventListener('click', () => showAlertBanner('Subscription cancellation logic is required.'));
+            
+            // === NEW EVENT LISTENERS ===
+            DOMElements.gainersTabBtn.addEventListener('click', () => {
+                DOMElements.gainersTabBtn.classList.add('active');
+                DOMElements.losersTabBtn.classList.remove('active');
+                DOMElements.gainersView.classList.remove('hidden');
+                DOMElements.losersView.classList.add('hidden');
+            });
+            DOMElements.losersTabBtn.addEventListener('click', () => {
+                DOMElements.losersTabBtn.classList.add('active');
+                DOMElements.gainersTabBtn.classList.remove('active');
+                DOMElements.losersView.classList.remove('hidden');
+                DOMElements.gainersView.classList.add('hidden');
+            });
+            DOMElements.watchlistContainer.addEventListener('click', e => { 
+                const tickerEl = e.target.closest('.sidebar-ticker');
+                if (tickerEl) showChartView(tickerEl.dataset.ticker); 
+            });
+            DOMElements.gainersView.addEventListener('click', e => {
+                const tickerEl = e.target.closest('.sidebar-ticker');
+                if (tickerEl) showChartView(tickerEl.dataset.ticker);
+            });
+            DOMElements.losersView.addEventListener('click', e => {
+                const tickerEl = e.target.closest('.sidebar-ticker');
+                if (tickerEl) showChartView(tickerEl.dataset.ticker);
+            });
         }
         
         // --- Page & UI Management ---
@@ -485,22 +564,71 @@
             startDataFetching();
         }
 
-        function showChartView(ticker) {
-            const plan = DOMElements.adminPanel.classList.contains('hidden') ? currentUserData.plan : DOMElements.adminPlanSelector.value;
-            if (plan === 'free') { showAlertBanner("Charting is a premium feature. Please upgrade."); return; }
-            
-            let chartSymbol = ticker;
-            // Check if the ticker is a known crypto symbol
-            const isCrypto = currentCryptoData.some(c => c.symbol === ticker);
-            if (isCrypto) {
-                chartSymbol = `COINBASE:${ticker}USD`;
-            }
+       // === ENHANCED showChartView FUNCTION ===
+       async function showChartView(ticker) {
+           const plan = DOMElements.adminPanel.classList.contains('hidden') ? currentUserData.plan : DOMElements.adminPlanSelector.value;
+           if (plan === 'free') { showAlertBanner("Charting & Ticker Details are premium features. Please upgrade."); return; }
+           
+           DOMElements.pages.chart.classList.remove('hidden');
+           DOMElements.chartTickerSymbol.textContent = ticker;
+           
+           // Reset profile and chart
+           DOMElements.tradingviewWidgetContainer.innerHTML = '<p class="text-neutral-500 text-center p-8">Loading Chart...</p>';
+           DOMElements.tickerProfileName.textContent = 'Loading...';
+           DOMElements.tickerProfileImage.src = '';
+           DOMElements.tickerProfileWebsite.href = '#';
+           DOMElements.tickerProfileWebsite.textContent = '';
+           DOMElements.tickerProfilePrice.textContent = '--';
+           DOMElements.tickerProfileChange.textContent = '';
+           DOMElements.tickerProfileDescription.textContent = 'Loading description...';
 
-            DOMElements.pages.chart.classList.remove('hidden');
-            DOMElements.chartTickerTitle.textContent = ticker;
-            DOMElements.tradingviewWidgetContainer.innerHTML = '';
-            new TradingView.widget({ "width": "100%", "height": "100%", "symbol": chartSymbol, "interval": "D", "timezone": "Etc/UTC", "theme": "dark", "style": "1", "locale": "en", "enable_publishing": false, "withdateranges": true, "hide_side_toolbar": false, "allow_symbol_change": true, "container_id": "tradingview-widget-container" });
-        }
+           let chartSymbol = ticker;
+           const isCrypto = currentCryptoData.some(c => c.symbol === ticker);
+
+           if (!isCrypto) {
+               // Fetch company profile for stocks
+               const profileData = await fetchCompanyProfile(ticker);
+               if (profileData) {
+                   DOMElements.tickerProfileName.textContent = profileData.companyName || 'N/A';
+                   DOMElements.tickerProfileImage.src = profileData.image || 'https://placehold.co/64x64/3f3f46/9ca3af?text=N/A';
+                   DOMElements.tickerProfileWebsite.href = profileData.website || '#';
+                   DOMElements.tickerProfileWebsite.textContent = (profileData.website && profileData.website.startsWith('http')) ? new URL(profileData.website).hostname : 'No website';
+                   DOMElements.tickerProfilePrice.textContent = profileData.price ? `$${profileData.price.toFixed(2)}` : '--';
+                   const change = profileData.changes;
+                   if (typeof change === 'number' && profileData.price) {
+                       const changePercent = (profileData.changes / (profileData.price - profileData.changes) * 100);
+                       if (isFinite(changePercent)) {
+                            const changeColor = change >= 0 ? 'text-green-400' : 'text-red-400';
+                            DOMElements.tickerProfileChange.innerHTML = `<span class="${changeColor}">${change.toFixed(2)} (${changePercent.toFixed(2)}%)</span>`;
+                       }
+                   }
+                   DOMElements.tickerProfileDescription.textContent = profileData.description || 'No description available.';
+               } else {
+                   DOMElements.tickerProfileName.textContent = `${ticker} Profile Not Found`;
+                   DOMElements.tickerProfileDescription.textContent = 'Could not load company profile data.';
+               }
+           } else {
+               // Handle profile for crypto
+               const cryptoData = currentCryptoData.find(c => c.symbol === ticker);
+               chartSymbol = `COINBASE:${ticker}USD`; // Use Coinbase for crypto charts
+               if(cryptoData) {
+                    DOMElements.tickerProfileName.textContent = cryptoData.name;
+                    DOMElements.tickerProfileImage.src = `https://placehold.co/64x64/3f3f46/f97316?text=${ticker}`; // Placeholder crypto icon
+                    DOMElements.tickerProfileWebsite.href = '#';
+                    DOMElements.tickerProfileWebsite.textContent = 'Cryptocurrency';
+                    const quote = cryptoData.quote.USD;
+                    DOMElements.tickerProfilePrice.textContent = quote.price < 0.01 ? `$${quote.price.toFixed(6)}` : `$${quote.price.toFixed(2)}`;
+                    const change = quote.percent_change_24h;
+                    const changeColor = change >= 0 ? 'text-green-400' : 'text-red-400';
+                    DOMElements.tickerProfileChange.innerHTML = `<span class="${changeColor}">${change.toFixed(2)}% (24h)</span>`;
+                    DOMElements.tickerProfileDescription.textContent = `${cryptoData.name} (${cryptoData.symbol}) is a cryptocurrency. Data provided by CoinMarketCap.`;
+               }
+           }
+
+           // Load TradingView widget
+           DOMElements.tradingviewWidgetContainer.innerHTML = '';
+           new TradingView.widget({ "width": "100%", "height": "100%", "symbol": chartSymbol, "interval": "D", "timezone": "Etc/UTC", "theme": "dark", "style": "1", "locale": "en", "enable_publishing": false, "withdateranges": true, "hide_side_toolbar": false, "allow_symbol_change": true, "container_id": "tradingview-widget-container" });
+       }
         
         function switchView(view) {
             ['flow', 'heatmap', 'crypto'].forEach(v => { DOMElements[`${v}ViewBtn`].classList.toggle('active', view === v); DOMElements[`${v}View`].classList.toggle('hidden', view !== v); });
@@ -513,11 +641,6 @@
             if (view === 'heatmap') renderHeatmap();
         }
         
-        // --- DIAGNOSIS FOR HEATMAP ---
-        // This function renders the heatmap. It *requires* the `currentFlowData` array to have data.
-        // If `currentFlowData` is empty (because the API call in `options-flow.js` is failing),
-        // this function will correctly show "No data for heatmap."
-        // The heatmap is not "broken"; it is correctly reporting that it has no data to draw.
         function renderHeatmap() {
             const container = d3.select("#heatmap-container");
             container.html('');
@@ -561,7 +684,9 @@
                 .attr("y", (d, i) => i * 1.1 + "em")
                 .attr("dy", "-0.25em")
                 .attr("fill", d => {
-                    const bullishRatio = d.data.totalPremium > 0 ? d.data.bullishPremium / d.data.totalPremium : 0.5;
+                    // Need to re-access the original data point 'd' from the parent 'g'
+                    const originalData = d3.select(d3.event.currentTarget.parentNode).datum().data;
+                    const bullishRatio = originalData.totalPremium > 0 ? originalData.bullishPremium / originalData.totalPremium : 0.5;
                     return d3.lab(d3.interpolateRdYlGn(bullishRatio)).l < 60 ? "#fff" : "#000"
                 })
                 .attr("font-weight", (d,i) => i === 0 ? "bold" : "normal")
@@ -578,11 +703,19 @@
             if (plan !== 'free') {
                 fetchAndRenderCrypto();
                 fetchAndRenderNews();
-                cryptoInterval = setInterval(fetchAndRenderCrypto, 300000);
-                newsInterval = setInterval(fetchAndRenderNews, 300000);
+               fetchAndRenderMovers(); // New
+               fetchAndRenderSectors(); // New
+               cryptoInterval = setInterval(fetchAndRenderCrypto, 300000); // 5 min
+               newsInterval = setInterval(fetchAndRenderNews, 300000); // 5 min
+               moversInterval = setInterval(fetchAndRenderMovers, 300000); // 5 min
+               sectorsInterval = setInterval(fetchAndRenderSectors, 300000); // 5 min
             } else {
                  DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Live crypto data is a premium feature.<br>Please upgrade your plan.</td></tr>`;
                  DOMElements.newsFeed.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">Upgrade to access the live news feed.</p>`;
+                // New free-tier placeholders
+                DOMElements.gainersView.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">Upgrade to access Market Movers.</p>`;
+                DOMElements.losersView.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">Upgrade to access Market Movers.</p>`;
+                DOMElements.sectorPerformanceContainer.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">Upgrade to access Sector Performance.</p>`;
             }
 
             if (plan !== 'free' && getMarketStatus().isOpen) {
@@ -596,7 +729,13 @@
             }
         }
 
-        function stopDataFetching() { if (flowInterval) clearInterval(flowInterval); if (newsInterval) clearInterval(newsInterval); if (cryptoInterval) clearInterval(cryptoInterval); }
+        function stopDataFetching() { 
+           if (flowInterval) clearInterval(flowInterval); 
+           if (newsInterval) clearInterval(newsInterval); 
+           if (cryptoInterval) clearInterval(cryptoInterval); 
+           if (moversInterval) clearInterval(moversInterval);
+           if (sectorsInterval) clearInterval(sectorsInterval);
+       }
 
         async function fetchAndRenderFlow(ticker = null) {
             if (isPaused || document.hidden) return;
@@ -605,8 +744,6 @@
 
             DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest flow data...</td></tr>`;
             const newData = await fetchOptionsFlowData(ticker);
-            // This 'if (newData)' check is key. If fetchOptionsFlowData fails (returns null),
-            // 'currentFlowData' remains an empty array, and the heatmap/filters will appear broken.
             if (newData) { currentFlowData = newData; renderFlowTable(); if (DOMElements.heatmapViewBtn.classList.contains('active')) renderHeatmap(); checkAlerts(newData); }
         }
         
@@ -622,6 +759,74 @@
                 DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Could not fetch crypto data.</td></tr>`;
             }
         }
+
+       // === NEW DATA FETCH/RENDER FUNCTIONS ===
+       async function fetchAndRenderMovers() {
+           if (isPaused || document.hidden) return;
+           const moversData = await fetchApi(MOVERS_PROXY_URL);
+           if (moversData) {
+               currentMoversData = moversData;
+               renderMarketMovers();
+           } else {
+               DOMElements.gainersView.innerHTML = `<p class="text-center text-neutral-500 p-4 text-xs">Could not load gainers.</p>`;
+               DOMElements.losersView.innerHTML = `<p class="text-center text-neutral-500 p-4 text-xs">Could not load losers.</p>`;
+           }
+       }
+
+       async function fetchAndRenderSectors() {
+           if (isPaused || document.hidden) return;
+           const sectorsData = await fetchApi(SECTORS_PROXY_URL);
+           if (sectorsData) {
+               currentSectorsData = sectorsData;
+               renderSectorPerformance();
+           } else {
+                DOMElements.sectorPerformanceContainer.innerHTML = `<p class="text-center text-neutral-500 p-4 text-xs">Could not load sector data.</p>`;
+           }
+       }
+
+       async function fetchCompanyProfile(ticker) {
+           const data = await fetchApi(`${PROFILE_PROXY_URL}?symbol=${ticker}`);
+           return data; // Returns profile object or null
+       }
+
+       function renderMarketMovers() {
+           const renderList = (data) => {
+               if (!data || data.length === 0) return `<p class="text-center text-neutral-500 p-4 text-xs">No data available.</p>`;
+               return data.map(item => {
+                   const change = parseFloat(item.changesPercentage);
+                   const color = change >= 0 ? 'text-green-400' : 'text-red-400';
+                   return `
+                   <div class="sidebar-ticker flex items-center justify-between p-2 rounded-md cursor-pointer" data-ticker="${item.symbol}">
+                       <div class="font-semibold">${item.symbol}</div>
+                       <div class="text-right">
+                           <div class="font-mono">${formatCurrency(item.price)}</div>
+                           <div class="font-mono ${color}">${change.toFixed(2)}%</div>
+                       </div>
+                   </div>`;
+               }).join('');
+           };
+           DOMElements.gainersView.innerHTML = renderList(currentMoversData.gainers);
+           DOMElements.losersView.innerHTML = renderList(currentMoversData.losers);
+       }
+
+       function renderSectorPerformance() {
+           if (!currentSectorsData || currentSectorsData.length === 0) {
+               DOMElements.sectorPerformanceContainer.innerHTML = `<p class="text-center text-neutral-500 p-4 text-xs">No sector data available.</p>`;
+               return;
+           }
+           // Sort by performance, highest to lowest
+           const sortedData = [...currentSectorsData].sort((a, b) => parseFloat(b.changesPercentage) - parseFloat(a.changesPercentage));
+
+           DOMElements.sectorPerformanceContainer.innerHTML = sortedData.map(item => {
+                const change = parseFloat(item.changesPercentage);
+                const color = change >= 0 ? 'text-green-400' : 'text-red-400';
+                return `
+                <div class="flex items-center justify-between p-2 rounded-md">
+                    <div class="font-semibold text-xs">${item.sector}</div>
+                    <div class="font-mono ${color} text-xs">${change.toFixed(2)}%</div>
+                </div>`;
+           }).join('');
+       }
 
         function renderFlowTable() {
             const filteredData = getFilteredAndSortedData();
@@ -695,7 +900,19 @@
         // --- Sidebar & Data Persistence ---
         function addWatchlistItem() { const ticker = DOMElements.watchlistInput.value.toUpperCase().trim(); if (ticker) { userWatchlist.add(ticker); DOMElements.watchlistInput.value = ''; updateUserData({ watchlist: Array.from(userWatchlist) }); } }
         function addAlertItem() { const ticker = DOMElements.alertTickerInput.value.toUpperCase().trim(); const premium = parseInt(DOMElements.alertPremiumSelect.value); if (ticker) { userAlerts.push({ ticker, premium }); DOMElements.alertTickerInput.value = ''; updateUserData({ alerts: userAlerts }); } }
-        function renderWatchlist() { DOMElements.watchlistContainer.innerHTML = [...userWatchlist].map(ticker => `<div class="flex items-center justify-between bg-neutral-800/50 p-2 rounded-md"><span class="font-semibold">${ticker}</span><button data-ticker="${ticker}" class="remove-watchlist-btn text-neutral-500 hover:text-red-400">&times;</button></div>`).join(''); document.querySelectorAll('.remove-watchlist-btn').forEach(btn => btn.addEventListener('click', (e) => { userWatchlist.delete(e.target.dataset.ticker); updateUserData({ watchlist: Array.from(userWatchlist) }); })); }
+        function renderWatchlist() { 
+           DOMElements.watchlistContainer.innerHTML = [...userWatchlist].map(ticker => `
+           <div class="sidebar-ticker flex items-center justify-between p-2 rounded-md cursor-pointer" data-ticker="${ticker}">
+               <span class="font-semibold">${ticker}</span>
+               <button data-ticker="${ticker}" class="remove-watchlist-btn text-neutral-500 hover:text-red-400 z-10">&times;</button>
+           </div>`).join(''); 
+           
+           document.querySelectorAll('.remove-watchlist-btn').forEach(btn => btn.addEventListener('click', (e) => { 
+               e.stopPropagation(); // Prevent click from triggering showChartView
+               userWatchlist.delete(e.target.dataset.ticker); 
+               updateUserData({ watchlist: Array.from(userWatchlist) }); 
+           })); 
+       }
         function renderAlerts() { DOMElements.alertsContainer.innerHTML = userAlerts.map((alert, index) => `<div class="flex items-center justify-between bg-neutral-800/50 p-2 rounded-md text-xs"><span>${alert.ticker} > ${formatCurrency(alert.premium)}</span><button data-index="${index}" class="remove-alert-btn text-neutral-500 hover:text-red-400">&times;</button></div>`).join(''); document.querySelectorAll('.remove-alert-btn').forEach(btn => btn.addEventListener('click', (e) => { userAlerts.splice(e.target.dataset.index, 1); updateUserData({ alerts: userAlerts }); })); }
         function checkAlerts(newData) { newData.forEach(trade => userAlerts.forEach(alert => { if (trade.symbol === alert.ticker && trade.totalValue >= alert.premium) { showAlertBanner(`${trade.symbol} alert: ${formatCurrency(trade.totalValue)} ${trade.sentiment} trade detected`); } })); }
         
@@ -750,12 +967,6 @@
         const timeAgo = (iso) => { if (!iso) return ''; const s = Math.floor((new Date() - new Date(iso)) / 1000); if (s < 0) return 'just now'; let i = s / 31536000; if (i > 1) return `${Math.floor(i)}y ago`; i = s / 2592000; if (i > 1) return `${Math.floor(i)}mo ago`; i = s / 86400; if (i > 1) return `${Math.floor(i)}d ago`; i = s / 3600; if (i > 1) return `${Math.floor(i)}h ago`; i = s / 60; if (i > 1) return `${Math.floor(i)}m ago`; return `${Math.floor(s)}s ago`; };
         const getFriendlyAuthError = (err) => { switch (err.code) { case 'auth/user-not-found': case 'auth/wrong-password': return 'Invalid email or password.'; case 'auth/email-already-in-use': return 'An account with this email already exists.'; case 'auth/popup-closed-by-user': return 'Sign-in window closed. Please try again.'; case 'auth/internal-error': return 'An internal authentication error occurred. Please try again later.' ; default: console.error("Authentication Error:", err); return 'An unexpected error occurred. Please try again.'; } };
         const togglePause = () => { isPaused = !isPaused; DOMElements.pausePlayBtn.innerHTML = isPaused ? '<i data-lucide="play-circle" class="w-4 h-4"></i><span>Resume</span>' : '<i data-lucide="pause-circle" class="w-4 h-4"></i><span>Pause</span>'; lucide.createIcons(); };
-        
-        // --- DIAGNOSIS FOR FILTERS ---
-        // This function handles the filter clicks. It works by filtering the `currentFlowData` array.
-        // If `currentFlowData` is empty (because the API call in `options-flow.js` is failing),
-        // this function will correctly filter an empty array and the table will remain empty.
-        // The filter logic is not "broken"; it is correctly reporting that it has no data to filter.
         const handleFilterClick = (e) => { const btn = e.target.closest('.control-button'); if(btn){ document.querySelectorAll('.control-button').forEach(b => b.classList.remove('active')); btn.classList.add('active'); activeFilter = btn.id.replace('filter-', ''); renderFlowTable(); }};
         const showAlertBanner = (msg) => { const banner = document.createElement('div'); banner.className = 'alert-banner bg-orange-500 text-white font-bold p-3 rounded-lg shadow-lg mb-2 flex items-center justify-between'; banner.innerHTML = `<span>${msg}</span><button class="ml-4 text-white/80 hover:text-white">&times;</button>`; DOMElements.alertBannerContainer.prepend(banner); banner.querySelector('button').addEventListener('click', () => banner.remove()); setTimeout(() => banner.remove(), 5000); };
         const showModal = (type) => { const content = { tos: { title: "Terms of Service", body: `<h4>1. Acceptance of Terms</h4><p>By accessing or using AlphaFlow, you agree to be bound by these Terms of Service...</p><h4>2. Financial Disclaimer</h4><p>AlphaFlow is a data provider and educational tool... You are solely responsible for your own investment decisions...</p>` }, privacy: { title: "Privacy Policy", body: `<h4>1. Information We Collect</h4><p>We collect information to provide and improve our Service...</p><h4>2. Use of Data</h4><p>AlphaFlow uses the collected data for various purposes...</p>`}, contact: { title: "Customer Service", body: `<h4>Contact Information</h4><p>For support, billing questions, or any other inquiries, please email our support team at: <a href="mailto:support@alphaflow.io" class="text-orange-400">support@alphaflow.io</a>.</p>` } }; DOMElements.modalTitle.textContent = content[type].title; DOMElements.modalBody.innerHTML = content[type].body.replace(/\.\.\./g, ' and other standard clauses.'); DOMElements.genericModal.classList.remove('hidden'); };
