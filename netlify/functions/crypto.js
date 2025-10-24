@@ -1,3 +1,5 @@
+// --- THIS IS THE FIX ---
+// This line was also missing from this file.
 const fetch = require('node-fetch');
 
 // This is your secure, serverless function that will run on Netlify's cloud infrastructure.
@@ -5,10 +7,8 @@ const fetch = require('node-fetch');
 // The handler function is the main entry point.
 exports.handler = async function(event, context) {
     // 1. Securely access the API key from Netlify's environment variables.
-    // This key is NEVER exposed to the user's browser.
     const CMC_PRO_API_KEY = process.env.CMC_PRO_API_KEY;
-    // Get the 'limit' from the query string, default to 100 if not provided
-    const limit = event.queryStringParameters.limit || '100';
+    const cryptoIds = event.queryStringParameters.id;
 
     // Check if the key has been set in the Netlify UI.
     if (!CMC_PRO_API_KEY) {
@@ -18,8 +18,8 @@ exports.handler = async function(event, context) {
         };
     }
 
-    // The API endpoint for CoinMarketCap, now using 'limit'
-    const url = `https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?limit=${limit}`;
+    // The API endpoint for CoinMarketCap.
+    const url = `https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?id=${cryptoIds}`;
 
     try {
         // 2. Make the request to the CoinMarketCap API, adding your secret key in the header.
@@ -51,3 +51,4 @@ exports.handler = async function(event, context) {
         };
     }
 };
+
