@@ -8,7 +8,8 @@ const fetch = require('node-fetch');
 exports.handler = async function(event, context) {
     // 1. Securely access the API key from Netlify's environment variables.
     const CMC_PRO_API_KEY = process.env.CMC_PRO_API_KEY;
-    const cryptoIds = event.queryStringParameters.id;
+    // const cryptoIds = event.queryStringParameters.id; // Original line
+    const cryptoIds = '1'; // --- TESTING: Request only Bitcoin ---
 
     // Check if the key has been set in the Netlify UI.
     if (!CMC_PRO_API_KEY) {
@@ -19,7 +20,9 @@ exports.handler = async function(event, context) {
     }
 
     // The API endpoint for CoinMarketCap.
+    // Using the simplified ID list for testing
     const url = `https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?id=${cryptoIds}`;
+    console.log("Attempting to fetch crypto data from:", url); // Add logging
 
     try {
         // 2. Make the request to the CoinMarketCap API, adding your secret key in the header.
@@ -29,13 +32,20 @@ exports.handler = async function(event, context) {
                 'Accept': 'application/json'
             }
         });
+        console.log("CMC API Response Status:", response.status); // Add logging
 
         if (!response.ok) {
-            const errorData = await response.json();
-            return { statusCode: response.status, body: JSON.stringify(errorData) };
+            const errorData = await response.text(); // Use text to catch non-JSON errors
+            console.error(`CMC API Error (${response.status}): ${errorData}`);
+            return { 
+                statusCode: response.status, 
+                // Try parsing as JSON, but fall back to raw text if it fails
+                body: JSON.stringify({ error: `CMC API request failed (${response.status}). See logs.`, rawError: errorData }) 
+            };
         }
 
         const data = await response.json();
+        console.log("Successfully fetched CMC crypto data.");
 
         // 3. Return the successful response to your frontend application.
         return {
@@ -44,10 +54,10 @@ exports.handler = async function(event, context) {
             body: JSON.stringify(data)
         };
     } catch (error) {
-        console.error('Netlify Function Error:', error);
+        console.error('Netlify Function Error (Crypto Catch Block):', error);
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: 'Failed to fetch data from CoinMarketCap API.' })
+            body: JSON.stringify({ error: `Netlify function failed: ${error.message}` })
         };
     }
 };
