@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-R">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AlphaFlow - Real-Time Options Flow & Market Intelligence</title>
     <meta name="description" content="AlphaFlow provides institutional-grade options order flow, advanced charting, and real-time market news to give you a trading edge.">
@@ -31,9 +31,9 @@
         ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #52525b; }
         .sticky-header { position: sticky; top: 0; z-index: 10; }
-        .control-button.active, .view-button.active, .tab-button.active { background-color: #ea580c; color: #ffffff; } /* Added .tab-button */
+        .control-button.active, .view-button.active { background-color: #ea580c; color: #ffffff; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
         .custom-select {
             background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
             background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-right: 2.5rem;
@@ -42,8 +42,8 @@
         @keyframes slideInDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .alert-banner { animation: slideInDown 0.5s ease-out forwards; }
         .heatmap-bubble { cursor: pointer; }
-        .heatmap-bubble circle { transition: transform 0.3s ease; }
-        .heatmap-bubble:hover circle { transform: scale(1.05); filter: drop-shadow(0 0 10px rgba(234, 88, 12, 0.7)); }
+        .heatmap-bubble circle { transition: all 0.3s ease; }
+        .heatmap-bubble:hover circle { transform: scale(1.05); filter: drop-shadow(0 0 10px rgba(234, 88, 12, 0.7)); stroke: #ea580c; }
         .page-container { overflow-y: auto; height: calc(100vh - 110px); }
         .modal { transition: opacity 0.25s ease; }
         .modal-content { transition: transform 0.25s ease; }
@@ -51,22 +51,45 @@
         .prose-invert a:hover { color: #fdba74; }
         .call-row { border-left: 3px solid #22c55e; }
         .put-row { border-left: 3px solid #ef4444; }
-        /* Added for new modules */
-        .sidebar-module { max-height: 300px; overflow-y: auto; }
-        .sidebar-ticker { transition: background-color 0.2s ease; }
-        .sidebar-ticker:hover { background-color: #3f3f46; }
+        
+        /* Skeleton Loader for tables */
+        .skeleton-loader {
+            background: linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite linear;
+            border-radius: 4px;
+        }
+        .skeleton-text { height: 1em; width: 70%; margin-bottom: 0.25em; }
+        .skeleton-text-short { height: 1em; width: 40%; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        /* Improved clickable row hover */
+        .clickable-row:hover { background-color: #3f3f46; }
+
+        /* Connection Status */
+        #connection-status {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            transition: background-color 0.3s ease;
+        }
+        #connection-status.connected { background-color: #22c55e; box-shadow: 0 0 8px #22c55e; }
+        #connection-status.connecting { background-color: #f59e0b; animation: pulse 1.5s infinite; }
+        #connection-status.disconnected { background-color: #ef4444; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
     </style>
 </head>
 <body class="text-sm">
     <!-- Loading Screen / Error State -->
     <div id="loading-screen" class="fixed inset-0 bg-neutral-950 z-[100] flex items-center justify-center transition-opacity duration-500 ease-in-out">
         <div id="loading-indicator" class="text-center">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-16 h-16 rounded-lg mx-auto animate-pulse" fill="none" stroke-linecap="round" stroke-linejoin="round"> <path d="M 20 80 L 50 20 L 80 80" stroke="#ea580c" stroke-width="20" /> </svg>
-            <p class="text-neutral-400 mt-4 text-lg font-semibold tracking-wider">Loading Dashboard...</p>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-16 h-16 rounded-lg mx-auto" fill="none" stroke-linecap="round" stroke-linejoin="round"> <path d="M 20 80 L 50 20 L 80 80" stroke="#ea580c" stroke-width="20" /> </svg>
+            <p class="text-neutral-400 mt-4 text-lg font-semibold tracking-wider">Authenticating & Connecting...</p>
         </div>
         <div id="error-container" class="hidden text-center max-w-lg p-4">
             <h2 class="text-2xl font-bold text-red-400">Initialization Failed</h2>
-            <p class="text-neutral-300 mt-2">Could not connect to backend services. Please check your configuration.</p>
+            <p class="text-neutral-300 mt-2">Could not initialize the application.</p>
             <p id="error-message" class="font-mono text-xs text-neutral-500 bg-neutral-900 p-3 rounded-md mt-4"></p>
         </div>
     </div>
@@ -89,7 +112,7 @@
             <div id="dashboard-page" class="page-container p-4">
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
                     <div class="col-span-1 lg:col-span-3 bg-neutral-900 rounded-lg shadow-lg flex flex-col h-[calc(100vh-140px)]">
-                        <div id="api-status-banner" class="hidden p-2 text-center bg-red-900/50 text-red-300 text-xs font-semibold border-b border-neutral-800">LIVE DATA-FEED FAILED.</div>
+                        <!-- REMOVED api-status-banner -->
                         <div class="p-3 border-b border-neutral-800 space-y-3">
                             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                <div class="flex items-center gap-2 p-1 bg-neutral-800/50 rounded-md">
@@ -114,11 +137,14 @@
                                      <select id="premium-select" class="custom-select bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500">
                                         <option value="0">Premium: All</option><option value="50000">&gt; $50k</option><option value="100000">&gt; $100k</option><option value="250000">&gt; $250k</option>
                                     </select>
-                                    
                                 </div>
                                  <div class="flex items-center gap-2">
                                     <button id="show-key-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 transition-colors text-xs"><i data-lucide="help-circle" class="w-4 h-4"></i><span>Key</span></button>
-                                    <button id="pause-play-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 transition-colors text-xs w-[80px] justify-center"><i data-lucide="pause-circle" class="w-4 h-4"></i><span>Pause</span></button>
+                                    <!-- Replaced Pause/Play with Connection Status -->
+                                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-neutral-800 text-xs w-[110px] justify-center">
+                                        <div id="connection-status" class="connecting"></div>
+                                        <span id="connection-text">Connecting...</span>
+                                    </div>
                                  </div>
                              </div>
                              <div id="crypto-controls" class="hidden flex items-center justify-between gap-3"><h2 class="text-xl font-bold text-white">Crypto Flow</h2></div>
@@ -127,50 +153,32 @@
                         <div id="flow-view" class="flex-grow overflow-y-auto">
                             <table class="w-full text-left text-xs">
                                 <thead class="sticky-header text-neutral-400 uppercase bg-neutral-900"><tr><th class="p-2">Time</th><th class="p-2">Ticker</th><th class="p-2">Details</th><th class="p-2">Sentiment</th><th class="p-2 text-right">Premium</th><th class="p-2 text-right">Vol / OI</th></tr></thead>
-                                <tbody id="options-tbody" class="divide-y divide-neutral-800"></tbody>
+                                <tbody id="options-tbody" class="divide-y divide-neutral-800">
+                                    <!-- Skeleton loader will be injected here -->
+                                </tbody>
                             </table>
                         </div>
                          <div id="heatmap-view" class="hidden flex-grow p-4 justify-center"><div id="heatmap-container" class="w-full h-full"></div></div>
                          <div id="crypto-view" class="hidden flex-grow overflow-y-auto">
                             <table class="w-full text-left text-xs">
                                 <thead class="sticky-header text-neutral-400 uppercase bg-neutral-900"><tr><th class="p-2">Name</th><th class="p-2 text-right">Price</th><th class="p-2 text-right">1h %</th><th class="p-2 text-right">24h %</th><th class="p-2 text-right">24h Volume</th><th class="p-2 text-right">Market Cap</th></tr></thead>
-                                <tbody id="crypto-tbody" class="divide-y divide-neutral-800"></tbody>
+                                <tbody id="crypto-tbody" class="divide-y divide-neutral-800">
+                                    <!-- Skeleton loader will be injected here -->
+                                </tbody>
                             </table>
                         </div>
                     </div>
                     <div class="col-span-1 bg-neutral-900 rounded-lg shadow-lg flex flex-col h-[calc(100vh-140px)]">
                         <div class="flex-grow overflow-y-auto p-3 space-y-4">
-                            <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Watchlist</h2><div class="flex gap-2 mb-3"><input type="text" id="watchlist-input" placeholder="Add Ticker..." class="bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs"><button id="add-watchlist-btn" class="bg-orange-600 hover:bg-orange-500 text-white font-semibold px-3 py-1.5 rounded-md transition-colors text-xs">Add</button></div><div id="watchlist-container" class="space-y-2 sidebar-module"></div></div>
-                            <!-- === NEW MARKET MOVERS MODULE === -->
-                            <div>
-                                <h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Market Movers</h2>
-                                <div class="flex items-center gap-1 p-1 bg-neutral-800/50 rounded-md mb-3">
-                                    <button id="gainers-tab-btn" class="tab-button active flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">Gainers</button>
-                                    <button id="losers-tab-btn" class="tab-button flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">Losers</button>
-                                </div>
-                                <div id="gainers-view" class="space-y-2 sidebar-module">
-                                    <!-- Gainers will be loaded here -->
-                                </div>
-                                <div id="losers-view" class="hidden space-y-2 sidebar-module">
-                                    <!-- Losers will be loaded here -->
-                                </div>
-                            </div>
-                            <!-- === END NEW MODULE === -->
-                            <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Alerts</h2><div class="space-y-2 mb-3"><input type="text" id="alert-ticker-input" placeholder="Ticker" class="bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs"><select id="alert-premium-select" class="custom-select bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"><option value="50000">Premium > $50k</option><option value="100000">Premium > $100k</option><option value="250000">Premium > $250k</option><option value="500000">Premium > $500k</option></select></div><button id="add-alert-btn" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold px-3 py-1.5 rounded-md transition-colors text-xs">Add Alert</button><div id="alerts-container" class="space-y-2 mt-3 sidebar-module"></div></div>
-                            <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Market News</h2><div id="news-feed" class="space-y-3 sidebar-module"></div></div>
-                            <!-- === NEW SECTOR PERFORMANCE MODULE === -->
-                            <div>
-                                <h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Sector Performance</h2>
-                                <div id="sector-performance-container" class="space-y-2 sidebar-module">
-                                    <!-- Sector performance will be loaded here -->
-                                </div>
-                            </div>
-                            <!-- === END NEW MODULE === -->
+                            <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Watchlist</h2><div class="flex gap-2 mb-3"><input type="text" id="watchlist-input" placeholder="Add Ticker..." class="bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs"><button id="add-watchlist-btn" class="bg-orange-600 hover:bg-orange-500 text-white font-semibold px-3 py-1.5 rounded-md transition-colors text-xs">Add</button></div><div id="watchlist-container" class="space-y-2"></div></div>
+                            <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Alerts</h2><div class="space-y-2 mb-3"><input type="text" id="alert-ticker-input" placeholder="Ticker" class="bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs"><select id="alert-premium-select" class="custom-select bg-neutral-800/50 border border-neutral-700 rounded-md px-3 py-1.5 w-full text-xs focus:outline-none focus:ring-2 focus:ring-orange-500"><option value="50000">Premium > $50k</option><option value="100000">Premium > $100k</option><option value="250000">Premium > $250k</option><option value="500000">Premium > $500k</option></select></div><button id="add-alert-btn" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold px-3 py-1.5 rounded-md transition-colors text-xs">Add Alert</button><div id="alerts-container" class="space-y-2 mt-3"></div></div>
+                            <div><h2 class="text-lg font-bold text-white pb-2 border-b border-neutral-800 mb-3">Market News</h2><div id="news-feed" class="space-y-3"></div></div>
                         </div>
                         <div class="p-3" id="ad-container"><div class="h-48 bg-neutral-800/50 rounded-lg flex flex-col p-4 border border-neutral-700 text-center justify-center"><p class="text-neutral-500 text-xs">A professional, ad-free experience is available on our Pro & Elite plans.</p><button id="sidebar-upgrade-btn" class="mt-4 text-sm font-medium bg-orange-600 px-3 py-1.5 rounded-md hover:bg-orange-500 transition-colors">Upgrade Now</button></div></div>
                     </div>
                 </div>
             </div>
+            <!-- Other pages (Plans, Account, Backtester, Chart) remain unchanged -->
             <div id="plans-page" class="hidden page-container p-4">
                  <div class="bg-neutral-900 rounded-lg shadow-lg w-full max-w-7xl mx-auto p-6">
                     <div class="text-center pb-2 border-b border-neutral-800 mb-6"><h2 class="text-3xl font-bold text-white">Choose Your Plan</h2><p class="text-neutral-400 mt-2">Unlock your trading edge with the right tools.</p></div>
@@ -210,61 +218,18 @@
                     </div>
                 </div>
             </div>
-             <!-- === MODIFIED CHART PAGE TO TICKER DETAIL PAGE === -->
              <div id="chart-page" class="hidden page-container absolute inset-0 bg-neutral-950 z-30 p-4">
                  <div class="bg-neutral-900 rounded-lg shadow-lg flex flex-col w-full h-full p-3">
-                     <div class="flex items-center justify-between pb-3 border-b border-neutral-800 mb-3">
+                     <div class="flex items-center justify-between pb-2 border-b border-neutral-800 mb-2">
                         <button id="back-to-dashboard-chart" class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 transition-colors"><i data-lucide="arrow-left" class="w-4 h-4"></i><span>Back</span></button>
-                        <h2 id="chart-ticker-symbol" class="text-2xl font-bold text-white"></h2>
-                        <div class="w-20"></div> <!-- Spacer -->
+                        <h2 id="chart-ticker-title" class="text-xl font-bold text-white"></h2><div></div>
                     </div>
-                    
-                    <!-- New Profile Section -->
-                    <div id="ticker-profile-container" class="flex-shrink-0 p-3 space-y-3">
-                        <div class="flex items-center justify-between gap-4">
-                            <div class="flex items-center gap-4">
-                                <img id="ticker-profile-image" src="" alt="Logo" class="w-16 h-16 rounded-full bg-neutral-800" onerror="this.src='https://placehold.co/64x64/3f3f46/9ca3af?text=N/A'; this.onerror=null;">
-                                <div>
-                                    <h3 id="ticker-profile-name" class="text-2xl font-bold text-white"></h3>
-                                    <a id="ticker-profile-website" href="#" target="_blank" rel="noopener noreferrer" class="text-sm text-orange-400 hover:underline"></a>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <h3 id="ticker-profile-price" class="text-3xl font-bold text-white"></h3>
-                                <div id="ticker-profile-change" class="text-lg font-semibold"></div>
-                            </div>
-                        </div>
-                        <p id="ticker-profile-description" class="text-sm text-neutral-400 max-h-24 overflow-y-auto"></p>
-                    </div>
-                    
-                    <!-- TradingView Widget -->
-                    <div id="tradingview-widget-container" class="flex-grow w-full min-h-[300px]">
-                        <!-- Widget loads here -->
-                    </div>
+                    <div id="tradingview-widget-container" class="flex-grow w-full"></div>
                 </div>
             </div>
         </div>
 
-        <div id="auth-page" class="flex flex-grow items-center justify-center p-4">
-            <div class="w-full max-w-md bg-neutral-900 p-8 rounded-lg shadow-lg border border-neutral-800">
-                <div class="text-center mb-8"><h2 class="text-3xl font-bold text-white">Welcome to AlphaFlow</h2><p class="text-neutral-400">Sign in or create an account to continue.</p></div>
-                <form id="auth-form" class="space-y-4">
-                     <div><label for="email" class="block text-neutral-400 mb-2 text-sm">Email</label><input type="email" id="email" class="w-full bg-neutral-800 border border-neutral-700 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-orange-500" required></div>
-                    <div><label for="password" class="block text-neutral-400 mb-2 text-sm">Password</label><input type="password" id="password" class="w-full bg-neutral-800 border border-neutral-700 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-orange-500" required></div>
-                    <div class="flex flex-col gap-4 pt-2">
-                        <button type="submit" id="signin-btn" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold py-3 rounded-md transition-colors">Sign In</button>
-                        <button type="button" id="signup-btn" class="w-full bg-neutral-700 hover:bg-neutral-600 text-white font-semibold py-3 rounded-md transition-colors" disabled>Create Account</button>
-                    </div>
-                </form>
-                <div class="relative flex py-5 items-center"><div class="flex-grow border-t border-neutral-700"></div><span class="flex-shrink mx-4 text-neutral-500 text-xs">OR</span><div class="flex-grow border-t border-neutral-700"></div></div>
-                <button id="google-signin-btn" class="w-full flex items-center justify-center gap-3 bg-white text-black font-semibold py-2.5 rounded-md hover:bg-neutral-200 transition-colors" disabled><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C12.955 4 4 12.955 4 24s8.955 20 20 20s20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083L43.595 20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002l6.19 5.238C42.612 34.843 44 30.012 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>Continue with Google</button>
-                <div class="mt-6 flex items-start gap-3">
-                    <input type="checkbox" id="tos-agree-checkbox" class="h-4 w-4 mt-1 rounded bg-neutral-700 border-neutral-600 text-orange-600 focus:ring-orange-500 accent-orange-600 shrink-0">
-                    <label for="tos-agree-checkbox" class="text-xs text-neutral-400">To create an account, I agree to the <a href="#" id="tos-link-auth" class="text-orange-400 hover:text-orange-300 underline">Terms of Service</a> and <a href="#" id="privacy-link-auth" class="text-orange-400 hover:text-orange-300 underline">Privacy Policy</a>.</label>
-                </div>
-                 <p id="auth-error" class="text-red-400 text-sm mt-4 h-5 text-center"></p>
-            </div>
-        </div>
+        <!-- AUTH PAGE REMOVED - Auth is now handled by the environment -->
         
         <footer class="flex items-center justify-between p-3 border-t border-neutral-800 bg-neutral-900 z-20 flex-shrink-0">
             <div id="admin-panel" class="hidden flex items-center gap-2">
@@ -286,41 +251,29 @@
     
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <script type="module" defer>
-        // Firebase Imports (v11.6.1)
+        // Firebase Imports (v11.6.1) - Using recommended versions
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // --- Configuration ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyDBQ0pvfmG9x3m8Da5Tsiekh6fermbKkQs",
-            authDomain: "alpha-flow-6c416.firebaseapp.com",
-            projectId: "alpha-flow-6c416",
-            storageBucket: "alpha-flow-6c416.appspot.com",
-            messagingSenderId: "1055894597563",
-            appId: "1:1055894597563:web:88c50b5907c4badc3b9e9e"
-        };
+        
+        // !!! IMPORTANT !!!
+        // This is the URL for your new AlphaFlow Engine.
+        // After you deploy it to Render.com, replace this placeholder
+        // with your new WebSocket URL (e.g., "wss://alphaflow-engine.onrender.com")
+        const WEBSOCKET_URL = 'wss://your-alphaflow-engine-url.onrender.com'; // <--- REPLACE THIS
+
         const STRIPE_PUBLISHABLE_KEY = 'YOUR_STRIPE_PUBLISHABLE_KEY'; // REPLACE THIS
         const ADMIN_EMAIL = "travisclevenger.tc@gmail.com";
-        const CRYPTO_IDS = '1,1027,5426,52,74,2010,2,1975,6636,5805'; // BTC, ETH, SOL, XRP, DOGE, ADA, LTC, LINK, DOT, AVAX
-
-        // Secure Netlify Function Endpoints
-        const CMC_PROXY_URL = '/.netlify/functions/crypto';
-        const FMP_PROXY_URL = '/.netlify/functions/options-flow';
-        const NEWS_PROXY_URL = '/.netlify/functions/news';
-        // === NEW FUNCTION ENDPOINTS ===
-        const MOVERS_PROXY_URL = '/.netlify/functions/market-movers';
-        const SECTORS_PROXY_URL = '/.netlify/functions/sector-performance';
-        const PROFILE_PROXY_URL = '/.netlify/functions/company-profile';
-
 
         // --- App State ---
         let app, auth, db;
         let stripe;
-        let flowInterval, newsInterval, cryptoInterval, moversInterval, sectorsInterval, dbUnsubscribe, marketCountdownInterval;
-        let currentFlowData = [], currentNewsData = [], currentCryptoData = [], currentMoversData = { gainers: [], losers: [] }, currentSectorsData = [];
+        let dbUnsubscribe, marketCountdownInterval;
+        let socket;
+        let currentFlowData = [], currentNewsData = [], currentCryptoData = [];
         let userWatchlist = new Set(), userAlerts = [];
-        let isPaused = false;
         let activeFilter = 'all', activeSort = 'timestamp-desc', activePremiumFilter = 0;
         let currentUser = null, currentUserData = null;
         let DOMElements; 
@@ -337,66 +290,123 @@
             if (errorContainer) errorContainer.classList.remove('hidden');
         }
 
-        // --- Authentication & User Data ---
-        function setupAuthListeners() {
-            DOMElements.signinBtn.addEventListener('click', handleSignIn);
-            DOMElements.signupBtn.addEventListener('click', handleSignUp);
-            DOMElements.googleSigninBtn.addEventListener('click', handleGoogleSignIn);
-            DOMElements.tosAgreeCheckbox.addEventListener('change', () => { 
-                DOMElements.signupBtn.disabled = !DOMElements.tosAgreeCheckbox.checked; 
-                DOMElements.googleSigninBtn.disabled = !DOMElements.tosAgreeCheckbox.checked; 
-            });
-        }
-
-        async function handleSignIn(e) { e.preventDefault(); DOMElements.authError.textContent = ''; await signInWithEmailAndPassword(auth, DOMElements.email.value, DOMElements.password.value).catch(err => DOMElements.authError.textContent = getFriendlyAuthError(err)); }
-        async function handleSignUp(e) { e.preventDefault(); DOMElements.authError.textContent = ''; if (!DOMElements.tosAgreeCheckbox.checked) return; await createUserWithEmailAndPassword(auth, DOMElements.email.value, DOMElements.password.value).catch(err => DOMElements.authError.textContent = getFriendlyAuthError(err)); }
+        // --- Authentication & User Data (NEW) ---
+        // This logic is now adapted for the collaborative environment
         
-        async function handleGoogleSignIn() {
-            if (!DOMElements.tosAgreeCheckbox.checked) return;
-            const provider = new GoogleAuthProvider();
+        async function initializeAuth() {
             try {
-                await signInWithPopup(auth, provider);
-            } catch (err) {
-                console.error("Google Sign-In Error Object:", err);
-                DOMElements.authError.textContent = `Google Sign-In Failed: ${getFriendlyAuthError(err)}`;
+                // Get config from the environment (injected by Canvas)
+                const firebaseConfig = JSON.parse(__firebase_config);
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                
+                // Set up the listener *before* signing in
+                onAuthStateChanged(auth, user => { 
+                    authReady = true; 
+                    currentUser = user; 
+                    if (user) { 
+                        // User is authenticated, now get their profile data
+                        loadUserData(user); 
+                    } else { 
+                        // This shouldn't happen with custom token, but handle it
+                        handleSignedOutState(); 
+                    } 
+                });
+
+                // Sign in with the provided token (injected by Canvas)
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    // Fallback for local testing (optional)
+                    console.warn("No __initial_auth_token found, signing in anonymously.");
+                    await signInAnonymously(auth);
+                }
+
+            } catch(e) {
+                console.error("Critical Firebase Initialization Error:", e);
+                showInitializationError(`Failed to initialize Firebase: ${e.message}. Ensure __firebase_config is provided.`);
             }
         }
         
         function loadUserData(user) {
             if (dbUnsubscribe) dbUnsubscribe();
-            const userRef = doc(db, "users", user.uid);
+            
+            // Generate a default App ID (as per instructions)
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            // Use user's UID (as per instructions)
+            const userId = user.uid;
+            
+            // Construct the Firestore path (private user data)
+            const userRef = doc(db, `artifacts/${appId}/users/${userId}/profile`, 'data');
+
             dbUnsubscribe = onSnapshot(userRef, async (docSnap) => {
                 if (!docSnap.exists()) {
-                    const newUser = { email: user.email, plan: user.email === ADMIN_EMAIL ? 'admin' : 'free', watchlist: ["SPY", "QQQ", "BTC"], alerts: [{ ticker: 'TSLA', premium: 250000 }], apiKey: `alphaflow-${crypto.randomUUID()}` };
-                    await setDoc(userRef, newUser);
-                    currentUserData = newUser;
-                } else { currentUserData = docSnap.data(); }
+                    // Create a new user profile document
+                    const newUser = { 
+                        email: user.email || 'user@alphaflow.com', 
+                        plan: user.email === ADMIN_EMAIL ? 'admin' : 'free', 
+                        watchlist: ["SPY", "QQQ", "BTC"], 
+                        alerts: [{ ticker: 'TSLA', premium: 250000 }], 
+                        apiKey: `alphaflow-${crypto.randomUUID()}` 
+                    };
+                    try {
+                        await setDoc(userRef, newUser);
+                        currentUserData = newUser;
+                    } catch (e) {
+                        console.error("Error creating user document:", e);
+                        showInitializationError(`Firestore Write Error: ${e.message}. Check Firestore rules.`);
+                        return;
+                    }
+                } else { 
+                    currentUserData = docSnap.data(); 
+                }
+                
                 userWatchlist = new Set(currentUserData.watchlist || []);
                 userAlerts = currentUserData.alerts || [];
                 
-                if (authReady) {
-                    handleSignedInState();
-                }
+                // Now that we are signed in AND have user data, start the app
+                handleSignedInState();
+                
             }, (error) => {
                 console.error("Firestore onSnapshot error:", error);
-                showAlertBanner("Error connecting to user database. Check Firestore rules and API key permissions.");
-                // If we can't get user data, we can't proceed. Show a critical error.
-                 showInitializationError(`Firestore Error: ${error.message}. This is likely a permissions issue. Ensure your Firestore rules allow reads/writes and the API key is correct.`);
+                showAlertBanner("Error connecting to user database. Check Firestore rules.");
+                showInitializationError(`Firestore Error: ${error.message}. This is likely a permissions issue.`);
             });
         }
         
+        async function updateUserData(data) {
+             if (!currentUser || !db) return;
+             
+             const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+             const userId = currentUser.uid;
+             const userRef = doc(db, `artifacts/${appId}/users/${userId}/profile`, 'data');
+
+             try {
+                await setDoc(userRef, data, { merge: true });
+             } catch (e) {
+                console.error("Failed to update user data:", e);
+                showAlertBanner("Failed to save changes. Please try again.");
+             }
+        }
+
         function handleSignedInState() {
             DOMElements.loadingScreen.style.opacity = '0';
             setTimeout(() => { DOMElements.loadingScreen.classList.add('hidden'); }, 500);
-            DOMElements.authPage.classList.add('hidden');
+            
+            // REMOVED AUTH PAGE
             DOMElements.mainAppContent.classList.remove('hidden');
             DOMElements.mainAppContent.classList.add('flex', 'flex-col');
             setActivePage('dashboard'); 
             renderHeader(); 
             updateUIForPlan(); 
-            startDataFetching(); 
+            
+            // Start WebSocket connection
+            connectWebSocket(); 
+            
             renderWatchlist(); 
             renderAlerts(); 
+            injectSkeletonLoaders();
             lucide.createIcons();
             if(marketCountdownInterval) clearInterval(marketCountdownInterval);
             marketCountdownInterval = setInterval(updateMarketCountdown, 1000);
@@ -404,26 +414,17 @@
         }
 
         function handleSignedOutState() {
+            // This state should ideally not be reached, but as a fallback:
             if (dbUnsubscribe) dbUnsubscribe();
             if(marketCountdownInterval) clearInterval(marketCountdownInterval);
             currentUserData = null;
             currentUser = null;
-            stopDataFetching();
-            if (DOMElements) {
-                DOMElements.mainAppContent.classList.add('hidden');
-                DOMElements.authPage.classList.remove('hidden');
-                DOMElements.authPage.classList.add('flex');
-                renderHeader(); 
-                const loadingScreen = document.getElementById('loading-screen');
-                if (loadingScreen) {
-                    loadingScreen.style.opacity = '0';
-                    setTimeout(() => loadingScreen.classList.add('hidden'), 500);
-                }
-            }
+            if (socket) socket.close();
+            
+            // Show error instead of auth page
+            showInitializationError("Authentication failed or session ended. Please refresh.");
         }
         
-        async function updateUserData(data) { if (currentUser) { await setDoc(doc(db, "users", currentUser.uid), data, { merge: true }); } }
-
         function renderHeader() {
             const headerAuthLinks = document.getElementById('header-auth-links');
             if (!headerAuthLinks) return;
@@ -431,43 +432,128 @@
             if (currentUser && currentUserData) {
                 const plan = DOMElements.adminPanel.classList.contains('hidden') ? currentUserData.plan : DOMElements.adminPlanSelector.value;
                 const planBadge = `<span class="bg-orange-600 text-white text-xs font-bold px-2 py-0.5 rounded-full uppercase">${plan}</span>`;
-                headerAuthLinks.innerHTML = `<button data-page="backtester" class="page-link">Backtester</button><button data-page="plans" class="page-link">Plans</button>${planBadge}<button data-page="account" class="page-link">My Account</button><button id="signout-btn">Sign Out</button>`;
-                document.getElementById('signout-btn').addEventListener('click', () => signOut(auth));
+                // Simplified header, removed "Sign Out"
+                headerAuthLinks.innerHTML = `
+                    <button data-page="backtester" class="page-link text-sm font-medium text-neutral-300 hover:text-white transition-colors">Backtester</button>
+                    <button data-page="plans" class="page-link text-sm font-medium text-neutral-300 hover:text-white transition-colors">Plans</button>
+                    ${planBadge}
+                    <button data-page="account" class="page-link text-sm font-medium text-neutral-300 hover:text-white transition-colors">My Account</button>`;
             } else {
-                headerAuthLinks.innerHTML = `<button data-page="plans" class="page-link">Plans</button><button id="signin-link-header" class="bg-orange-600 px-3 py-1.5 rounded-md hover:bg-orange-500">Sign In</button>`;
-                const signinLink = document.getElementById('signin-link-header');
-                if (signinLink) {
-                    signinLink.addEventListener('click', () => { 
-                        if (DOMElements) {
-                            DOMElements.mainAppContent.classList.add('hidden'); 
-                            DOMElements.authPage.classList.remove('hidden'); 
-                            DOMElements.authPage.classList.add('flex'); 
-                        }
-                    });
-                }
+                headerAuthLinks.innerHTML = `<button data-page="plans" class="page-link text-sm font-medium text-neutral-300 hover:text-white transition-colors">Plans</button>`;
             }
             headerAuthLinks.querySelectorAll('.page-link').forEach(link => { 
-                link.className = 'text-sm font-medium text-neutral-300 hover:text-white transition-colors'; 
                 link.addEventListener('click', (e) => { 
-                    if (!currentUser && DOMElements) { 
-                        DOMElements.authPage.classList.add('hidden'); 
-                        DOMElements.mainAppContent.classList.remove('hidden'); 
-                    } 
                     setActivePage(e.currentTarget.dataset.page); 
                 }); 
             });
         }
 
-        // --- Core Application Logic ---
+        // --- WebSocket Connection (NEW) ---
+        function connectWebSocket() {
+            if (WEBSOCKET_URL.includes('your-alphaflow-engine-url')) {
+                showInitializationError('The WebSocket URL is not configured. Please update WEBSOCKET_URL in index.html.');
+                updateConnectionStatus('disconnected');
+                return;
+            }
+
+            console.log(`Connecting to ${WEBSOCKET_URL}...`);
+            updateConnectionStatus('connecting');
+
+            // Use wss:// for secure connections
+            socket = new WebSocket(WEBSOCKET_URL);
+
+            socket.onopen = () => {
+                console.log('WebSocket connection established.');
+                updateConnectionStatus('connected');
+                showAlertBanner('Connected to live data feed.', 'success');
+            };
+
+            socket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    // Handle different message types from the engine
+                    switch (data.type) {
+                        case 'OPTIONS_FLOW_UPDATE':
+                            if (currentUserData.plan !== 'free') {
+                                currentFlowData = data.payload;
+                                renderFlowTable();
+                                if (DOMElements.heatmapViewBtn.classList.contains('active')) renderHeatmap();
+                                checkAlerts(data.payload);
+                            }
+                            break;
+                        case 'CRYPTO_UPDATE':
+                             if (currentUserData.plan !== 'free') {
+                                currentCryptoData = data.payload;
+                                renderCryptoFlowTable();
+                             }
+                            break;
+                        case 'NEWS_UPDATE':
+                             if (currentUserData.plan !== 'free') {
+                                currentNewsData = data.payload;
+                                renderNewsFeed();
+                             }
+                            break;
+                        case 'SYSTEM_MESSAGE':
+                            console.log('System Message:', data.payload);
+                            break;
+                        default:
+                            console.warn('Unknown WebSocket message type:', data.type);
+                    }
+                } catch (e) {
+                    console.error('Error parsing WebSocket message:', e);
+                }
+            };
+
+            socket.onclose = (event) => {
+                console.warn('WebSocket connection closed.', event.code, event.reason);
+                updateConnectionStatus('disconnected');
+                showAlertBanner('Disconnected from live data feed. Attempting to reconnect...', 'error');
+                
+                // Implement exponential backoff for reconnection
+                setTimeout(connectWebSocket, 5000); // Simple 5-second reconnect
+            };
+
+            socket.onerror = (error) => {
+                console.error('WebSocket Error:', error);
+                updateConnectionStatus('disconnected');
+                // The 'onclose' event will usually fire after 'onerror'
+            };
+        }
+
+        function updateConnectionStatus(status) {
+            const statusEl = DOMElements.connectionStatus;
+            const textEl = DOMElements.connectionText;
+            if (!statusEl || !textEl) return;
+
+            statusEl.classList.remove('connected', 'connecting', 'disconnected');
+            switch (status) {
+                case 'connected':
+                    statusEl.classList.add('connected');
+                    textEl.textContent = 'Connected';
+                    break;
+                case 'connecting':
+                    statusEl.classList.add('connecting');
+                    textEl.textContent = 'Connecting...';
+                    break;
+                case 'disconnected':
+                    statusEl.classList.add('disconnected');
+                    textEl.textContent = 'Disconnected';
+                    break;
+            }
+        }
+
+
+        // --- Core Application Logic (Listeners) ---
         function setupEventListeners() {
             document.getElementById('show-key-btn').addEventListener('click', () => DOMElements.keyPopup.classList.remove('hidden'));
             DOMElements.closeKeyBtn.addEventListener('click', () => DOMElements.keyPopup.classList.add('hidden'));
             DOMElements.keyCtaBtn.addEventListener('click', () => DOMElements.keyPopup.classList.add('hidden'));
-            ['tos-link-auth', 'footer-tos-link'].forEach(id => document.getElementById(id).addEventListener('click', e => { e.preventDefault(); showModal('tos'); }));
-            ['privacy-link-auth', 'footer-privacy-link'].forEach(id => document.getElementById(id).addEventListener('click', e => { e.preventDefault(); showModal('privacy'); }));
+            ['footer-tos-link'].forEach(id => document.getElementById(id).addEventListener('click', e => { e.preventDefault(); showModal('tos'); }));
+            ['footer-privacy-link'].forEach(id => document.getElementById(id).addEventListener('click', e => { e.preventDefault(); showModal('privacy'); }));
             document.getElementById('footer-contact-link').addEventListener('click', e => { e.preventDefault(); showModal('contact'); });
             document.querySelector('[data-close-modal]').addEventListener('click', () => DOMElements.genericModal.classList.add('hidden'));
-            DOMElements.pausePlayBtn.addEventListener('click', togglePause);
+            // REMOVED Pause/Play listener
             DOMElements.flowFilters.addEventListener('click', handleFilterClick);
             DOMElements.sortSelect.addEventListener('change', e => { activeSort = e.target.value; renderFlowTable(); });
             DOMElements.premiumSelect.addEventListener('change', e => { activePremiumFilter = parseInt(e.target.value); renderFlowTable(); });
@@ -477,12 +563,7 @@
                     const searchTerm = e.target.value.toUpperCase().trim();
                      e.preventDefault();
                     if(!searchTerm) return;
-                    
-                    if (DOMElements.cryptoViewBtn.classList.contains('active')) {
-                       showChartView(searchTerm);
-                    } else {
-                       showChartView(searchTerm);
-                    }
+                    showChartView(searchTerm);
                 }
             });
 
@@ -491,7 +572,7 @@
             DOMElements.cryptoViewBtn.addEventListener('click', () => switchView('crypto'));
             DOMElements.addWatchlistBtn.addEventListener('click', addWatchlistItem);
             DOMElements.addAlertBtn.addEventListener('click', addAlertItem);
-            DOMElements.homeLogo.addEventListener('click', () => { if (currentUser) setActivePage('dashboard'); else handleSignedOutState(); });
+            DOMElements.homeLogo.addEventListener('click', () => { if (currentUser) setActivePage('dashboard'); });
             DOMElements.accountChangePlanBtn.addEventListener('click', () => setActivePage('plans'));
             DOMElements.sidebarUpgradeBtn.addEventListener('click', () => setActivePage('plans'));
             DOMElements.backtesterUpgradeBtn.addEventListener('click', () => setActivePage('plans'));
@@ -502,32 +583,6 @@
             DOMElements.adminPlanSelector.addEventListener('change', () => { updateUIForPlan(); renderHeader(); });
             DOMElements.manageBillingBtn.addEventListener('click', () => showAlertBanner('Billing portal integration is required.'));
             DOMElements.cancelSubscriptionBtn.addEventListener('click', () => showAlertBanner('Subscription cancellation logic is required.'));
-            
-            // === NEW EVENT LISTENERS ===
-            DOMElements.gainersTabBtn.addEventListener('click', () => {
-                DOMElements.gainersTabBtn.classList.add('active');
-                DOMElements.losersTabBtn.classList.remove('active');
-                DOMElements.gainersView.classList.remove('hidden');
-                DOMElements.losersView.classList.add('hidden');
-            });
-            DOMElements.losersTabBtn.addEventListener('click', () => {
-                DOMElements.losersTabBtn.classList.add('active');
-                DOMElements.gainersTabBtn.classList.remove('active');
-                DOMElements.losersView.classList.remove('hidden');
-                DOMElements.gainersView.classList.add('hidden');
-            });
-            DOMElements.watchlistContainer.addEventListener('click', e => { 
-                const tickerEl = e.target.closest('.sidebar-ticker');
-                if (tickerEl) showChartView(tickerEl.dataset.ticker); 
-            });
-            DOMElements.gainersView.addEventListener('click', e => {
-                const tickerEl = e.target.closest('.sidebar-ticker');
-                if (tickerEl) showChartView(tickerEl.dataset.ticker);
-            });
-            DOMElements.losersView.addEventListener('click', e => {
-                const tickerEl = e.target.closest('.sidebar-ticker');
-                if (tickerEl) showChartView(tickerEl.dataset.ticker);
-            });
         }
         
         // --- Page & UI Management ---
@@ -561,74 +616,49 @@
                 btn.classList.toggle('opacity-50', btn.disabled);
                 btn.classList.toggle('cursor-default', btn.disabled);
             });
-            startDataFetching();
+            
+            // Handle 'free' plan UI state
+            if (plan === 'free') {
+                 DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Live crypto data is a premium feature.<br>Please upgrade your plan.</td></tr>`;
+                 DOMElements.newsFeed.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">Upgrade to access the live news feed.</p>`;
+                 DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Live options flow is a premium feature.<br>Please upgrade your plan.</td></tr>`;
+            } else {
+                // If not free, show loaders if data isn't in yet
+                if (currentCryptoData.length === 0) injectSkeletonLoaders(DOMElements.cryptoTbody, 6, 5);
+                if (currentFlowData.length === 0) injectSkeletonLoaders(DOMElements.optionsTbody, 6, 10);
+                if (currentNewsData.length === 0) DOMElements.newsFeed.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">Loading news feed...</p>`;
+            }
+        }
+        
+        function injectSkeletonLoaders(tbody, cols = 6, rows = 10) {
+            if (!tbody) return;
+            let html = '';
+            for (let i = 0; i < rows; i++) {
+                html += '<tr>';
+                for (let j = 0; j < cols; j++) {
+                    html += `<td class="p-2"><div class="skeleton-loader ${j % 2 === 0 ? 'skeleton-text' : 'skeleton-text-short'}"></div></td>`;
+                }
+                html += '</tr>';
+            }
+            tbody.innerHTML = html;
         }
 
-       // === ENHANCED showChartView FUNCTION ===
-       async function showChartView(ticker) {
-           const plan = DOMElements.adminPanel.classList.contains('hidden') ? currentUserData.plan : DOMElements.adminPlanSelector.value;
-           if (plan === 'free') { showAlertBanner("Charting & Ticker Details are premium features. Please upgrade."); return; }
-           
-           DOMElements.pages.chart.classList.remove('hidden');
-           DOMElements.chartTickerSymbol.textContent = ticker;
-           
-           // Reset profile and chart
-           DOMElements.tradingviewWidgetContainer.innerHTML = '<p class="text-neutral-500 text-center p-8">Loading Chart...</p>';
-           DOMElements.tickerProfileName.textContent = 'Loading...';
-           DOMElements.tickerProfileImage.src = '';
-           DOMElements.tickerProfileWebsite.href = '#';
-           DOMElements.tickerProfileWebsite.textContent = '';
-           DOMElements.tickerProfilePrice.textContent = '--';
-           DOMElements.tickerProfileChange.textContent = '';
-           DOMElements.tickerProfileDescription.textContent = 'Loading description...';
+        function showChartView(ticker) {
+            const plan = DOMElements.adminPanel.classList.contains('hidden') ? currentUserData.plan : DOMElements.adminPlanSelector.value;
+            if (plan === 'free') { showAlertBanner("Charting is a premium feature. Please upgrade."); return; }
+            
+            let chartSymbol = ticker;
+            // Check if the ticker is a known crypto symbol
+            const isCrypto = currentCryptoData.some(c => c.symbol === ticker);
+            if (isCrypto) {
+                chartSymbol = `COINBASE:${ticker}USD`;
+            }
 
-           let chartSymbol = ticker;
-           const isCrypto = currentCryptoData.some(c => c.symbol === ticker);
-
-           if (!isCrypto) {
-               // Fetch company profile for stocks
-               const profileData = await fetchCompanyProfile(ticker);
-               if (profileData) {
-                   DOMElements.tickerProfileName.textContent = profileData.companyName || 'N/A';
-                   DOMElements.tickerProfileImage.src = profileData.image || 'https://placehold.co/64x64/3f3f46/9ca3af?text=N/A';
-                   DOMElements.tickerProfileWebsite.href = profileData.website || '#';
-                   DOMElements.tickerProfileWebsite.textContent = (profileData.website && profileData.website.startsWith('http')) ? new URL(profileData.website).hostname : 'No website';
-                   DOMElements.tickerProfilePrice.textContent = profileData.price ? `$${profileData.price.toFixed(2)}` : '--';
-                   const change = profileData.changes;
-                   if (typeof change === 'number' && profileData.price) {
-                       const changePercent = (profileData.changes / (profileData.price - profileData.changes) * 100);
-                       if (isFinite(changePercent)) {
-                            const changeColor = change >= 0 ? 'text-green-400' : 'text-red-400';
-                            DOMElements.tickerProfileChange.innerHTML = `<span class="${changeColor}">${change.toFixed(2)} (${changePercent.toFixed(2)}%)</span>`;
-                       }
-                   }
-                   DOMElements.tickerProfileDescription.textContent = profileData.description || 'No description available.';
-               } else {
-                   DOMElements.tickerProfileName.textContent = `${ticker} Profile Not Found`;
-                   DOMElements.tickerProfileDescription.textContent = 'Could not load company profile data.';
-               }
-           } else {
-               // Handle profile for crypto
-               const cryptoData = currentCryptoData.find(c => c.symbol === ticker);
-               chartSymbol = `COINBASE:${ticker}USD`; // Use Coinbase for crypto charts
-               if(cryptoData) {
-                    DOMElements.tickerProfileName.textContent = cryptoData.name;
-                    DOMElements.tickerProfileImage.src = `https://placehold.co/64x64/3f3f46/f97316?text=${ticker}`; // Placeholder crypto icon
-                    DOMElements.tickerProfileWebsite.href = '#';
-                    DOMElements.tickerProfileWebsite.textContent = 'Cryptocurrency';
-                    const quote = cryptoData.quote.USD;
-                    DOMElements.tickerProfilePrice.textContent = quote.price < 0.01 ? `$${quote.price.toFixed(6)}` : `$${quote.price.toFixed(2)}`;
-                    const change = quote.percent_change_24h;
-                    const changeColor = change >= 0 ? 'text-green-400' : 'text-red-400';
-                    DOMElements.tickerProfileChange.innerHTML = `<span class="${changeColor}">${change.toFixed(2)}% (24h)</span>`;
-                    DOMElements.tickerProfileDescription.textContent = `${cryptoData.name} (${cryptoData.symbol}) is a cryptocurrency. Data provided by CoinMarketCap.`;
-               }
-           }
-
-           // Load TradingView widget
-           DOMElements.tradingviewWidgetContainer.innerHTML = '';
-           new TradingView.widget({ "width": "100%", "height": "100%", "symbol": chartSymbol, "interval": "D", "timezone": "Etc/UTC", "theme": "dark", "style": "1", "locale": "en", "enable_publishing": false, "withdateranges": true, "hide_side_toolbar": false, "allow_symbol_change": true, "container_id": "tradingview-widget-container" });
-       }
+            DOMElements.pages.chart.classList.remove('hidden');
+            DOMElements.chartTickerTitle.textContent = ticker;
+            DOMElements.tradingviewWidgetContainer.innerHTML = '';
+            new TradingView.widget({ "width": "100%", "height": "100%", "symbol": chartSymbol, "interval": "D", "timezone": "Etc/UTC", "theme": "dark", "style": "1", "locale": "en", "enable_publishing": false, "withdateranges": true, "hide_side_toolbar": false, "allow_symbol_change": true, "container_id": "tradingview-widget-container" });
+        }
         
         function switchView(view) {
             ['flow', 'heatmap', 'crypto'].forEach(v => { DOMElements[`${v}ViewBtn`].classList.toggle('active', view === v); DOMElements[`${v}View`].classList.toggle('hidden', view !== v); });
@@ -645,7 +675,7 @@
             const container = d3.select("#heatmap-container");
             container.html('');
             if (currentFlowData.length === 0) {
-                container.append('p').attr('class', 'text-neutral-500 text-center').text('No data for heatmap.');
+                container.append('p').attr('class', 'text-neutral-500 text-center').text('Awaiting data for heatmap...');
                 return;
             }
 
@@ -684,158 +714,27 @@
                 .attr("y", (d, i) => i * 1.1 + "em")
                 .attr("dy", "-0.25em")
                 .attr("fill", d => {
-                    // Need to re-access the original data point 'd' from the parent 'g'
-                    const originalData = d3.select(d3.event.currentTarget.parentNode).datum().data;
-                    const bullishRatio = originalData.totalPremium > 0 ? originalData.bullishPremium / originalData.totalPremium : 0.5;
-                    return d3.lab(d3.interpolateRdYlGn(bullishRatio)).l < 60 ? "#fff" : "#000"
+                    // Use D3's LCH color space to check lightness for text contrast
+                    return d3.lch(d3.interpolateRdYlGn(d.data.bullishPremium / d.data.totalPremium)).l > 65 ? "#000" : "#fff";
                 })
                 .attr("font-weight", (d,i) => i === 0 ? "bold" : "normal")
                 .text(d => d);
         }
         
-        // --- Data Fetching & Rendering ---
-        function startDataFetching() {
-            stopDataFetching();
-            if (!currentUserData || !authReady) return;
-
-            const plan = DOMElements.adminPanel.classList.contains('hidden') ? (currentUserData.plan) : DOMElements.adminPlanSelector.value;
-            
-            if (plan !== 'free') {
-                fetchAndRenderCrypto();
-                fetchAndRenderNews();
-               fetchAndRenderMovers(); // New
-               fetchAndRenderSectors(); // New
-               cryptoInterval = setInterval(fetchAndRenderCrypto, 300000); // 5 min
-               newsInterval = setInterval(fetchAndRenderNews, 300000); // 5 min
-               moversInterval = setInterval(fetchAndRenderMovers, 300000); // 5 min
-               sectorsInterval = setInterval(fetchAndRenderSectors, 300000); // 5 min
-            } else {
-                 DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Live crypto data is a premium feature.<br>Please upgrade your plan.</td></tr>`;
-                 DOMElements.newsFeed.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">Upgrade to access the live news feed.</p>`;
-                // New free-tier placeholders
-                DOMElements.gainersView.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">Upgrade to access Market Movers.</p>`;
-                DOMElements.losersView.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">Upgrade to access Market Movers.</p>`;
-                DOMElements.sectorPerformanceContainer.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">Upgrade to access Sector Performance.</p>`;
-            }
-
-            if (plan !== 'free' && getMarketStatus().isOpen) {
-                fetchAndRenderFlow();
-                flowInterval = setInterval(fetchAndRenderFlow, 90000); 
-            } else {
-                 DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Market is currently closed. Live options flow will resume on open.</td></tr>`;
-                 if (plan === 'free') {
-                    DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Live options flow is a premium feature.<br>Please upgrade your plan.</td></tr>`;
-                 }
-            }
-        }
-
-        function stopDataFetching() { 
-           if (flowInterval) clearInterval(flowInterval); 
-           if (newsInterval) clearInterval(newsInterval); 
-           if (cryptoInterval) clearInterval(cryptoInterval); 
-           if (moversInterval) clearInterval(moversInterval);
-           if (sectorsInterval) clearInterval(sectorsInterval);
-       }
-
-        async function fetchAndRenderFlow(ticker = null) {
-            if (isPaused || document.hidden) return;
-            const marketStatus = getMarketStatus();
-            if (!marketStatus.isOpen && !ticker) return;
-
-            DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest flow data...</td></tr>`;
-            const newData = await fetchOptionsFlowData(ticker);
-            if (newData) { currentFlowData = newData; renderFlowTable(); if (DOMElements.heatmapViewBtn.classList.contains('active')) renderHeatmap(); checkAlerts(newData); }
-        }
-        
-        async function fetchAndRenderNews() { if (isPaused || document.hidden) return; const newsData = await fetchNewsData(); if(newsData) { currentNewsData = newsData; renderNewsFeed(); } }
-        async function fetchAndRenderCrypto() { 
-            if (isPaused || document.hidden) return;
-            DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Fetching latest crypto data...</td></tr>`;
-            const data = await fetchCryptoFlowData(); 
-            if(data) {
-                currentCryptoData = data;
-                renderCryptoFlowTable();
-            } else {
-                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Could not fetch crypto data.</td></tr>`;
-            }
-        }
-
-       // === NEW DATA FETCH/RENDER FUNCTIONS ===
-       async function fetchAndRenderMovers() {
-           if (isPaused || document.hidden) return;
-           const moversData = await fetchApi(MOVERS_PROXY_URL);
-           if (moversData) {
-               currentMoversData = moversData;
-               renderMarketMovers();
-           } else {
-               DOMElements.gainersView.innerHTML = `<p class="text-center text-neutral-500 p-4 text-xs">Could not load gainers.</p>`;
-               DOMElements.losersView.innerHTML = `<p class="text-center text-neutral-500 p-4 text-xs">Could not load losers.</p>`;
-           }
-       }
-
-       async function fetchAndRenderSectors() {
-           if (isPaused || document.hidden) return;
-           const sectorsData = await fetchApi(SECTORS_PROXY_URL);
-           if (sectorsData) {
-               currentSectorsData = sectorsData;
-               renderSectorPerformance();
-           } else {
-                DOMElements.sectorPerformanceContainer.innerHTML = `<p class="text-center text-neutral-500 p-4 text-xs">Could not load sector data.</p>`;
-           }
-       }
-
-       async function fetchCompanyProfile(ticker) {
-           const data = await fetchApi(`${PROFILE_PROXY_URL}?symbol=${ticker}`);
-           return data; // Returns profile object or null
-       }
-
-       function renderMarketMovers() {
-           const renderList = (data) => {
-               if (!data || data.length === 0) return `<p class="text-center text-neutral-500 p-4 text-xs">No data available.</p>`;
-               return data.map(item => {
-                   const change = parseFloat(item.changesPercentage);
-                   const color = change >= 0 ? 'text-green-400' : 'text-red-400';
-                   return `
-                   <div class="sidebar-ticker flex items-center justify-between p-2 rounded-md cursor-pointer" data-ticker="${item.symbol}">
-                       <div class="font-semibold">${item.symbol}</div>
-                       <div class="text-right">
-                           <div class="font-mono">${formatCurrency(item.price)}</div>
-                           <div class="font-mono ${color}">${change.toFixed(2)}%</div>
-                       </div>
-                   </div>`;
-               }).join('');
-           };
-           DOMElements.gainersView.innerHTML = renderList(currentMoversData.gainers);
-           DOMElements.losersView.innerHTML = renderList(currentMoversData.losers);
-       }
-
-       function renderSectorPerformance() {
-           if (!currentSectorsData || currentSectorsData.length === 0) {
-               DOMElements.sectorPerformanceContainer.innerHTML = `<p class="text-center text-neutral-500 p-4 text-xs">No sector data available.</p>`;
-               return;
-           }
-           // Sort by performance, highest to lowest
-           const sortedData = [...currentSectorsData].sort((a, b) => parseFloat(b.changesPercentage) - parseFloat(a.changesPercentage));
-
-           DOMElements.sectorPerformanceContainer.innerHTML = sortedData.map(item => {
-                const change = parseFloat(item.changesPercentage);
-                const color = change >= 0 ? 'text-green-400' : 'text-red-400';
-                return `
-                <div class="flex items-center justify-between p-2 rounded-md">
-                    <div class="font-semibold text-xs">${item.sector}</div>
-                    <div class="font-mono ${color} text-xs">${change.toFixed(2)}%</div>
-                </div>`;
-           }).join('');
-       }
+        // --- Data Fetching & Rendering (MODIFIED) ---
+        // All 'fetch' functions are GONE. We just render what the WebSocket gives us.
 
         function renderFlowTable() {
+            const plan = DOMElements.adminPanel.classList.contains('hidden') ? currentUserData.plan : DOMElements.adminPlanSelector.value;
+            if (plan === 'free') return; // Handled by updateUIForPlan
+
             const filteredData = getFilteredAndSortedData();
             if (filteredData.length === 0 && getMarketStatus().isOpen) { DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">No unusual options activity found for your criteria.</td></tr>`; return; }
             if (filteredData.length === 0 && !getMarketStatus().isOpen) { DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Market is currently closed. Live options flow will resume on open.</td></tr>`; return;}
             if (filteredData.length === 0) return;
 
             DOMElements.optionsTbody.innerHTML = filteredData.map(item => `
-                <tr class="fade-in cursor-pointer hover:bg-neutral-800/50 ${item.putCall === 'CALL' ? 'call-row' : 'put-row'}" data-ticker="${item.symbol}">
+                <tr class="fade-in clickable-row cursor-pointer ${item.putCall === 'CALL' ? 'call-row' : 'put-row'}" data-ticker="${item.symbol}">
                     <td class="p-2 text-neutral-400">${new Date(item.timestamp * 1000).toLocaleTimeString()}</td>
                     <td class="p-2 font-semibold text-white">${item.symbol}</td>
                     <td class="p-2">
@@ -854,13 +753,17 @@
         }
         
         function renderNewsFeed() {
+             const plan = DOMElements.adminPanel.classList.contains('hidden') ? currentUserData.plan : DOMElements.adminPlanSelector.value;
+             if (plan === 'free') return; // Handled
              if (!currentNewsData || currentNewsData.length === 0) { DOMElements.newsFeed.innerHTML = `<p class="text-center text-neutral-500 p-8 text-xs">News feed unavailable.</p>`; return; }
              DOMElements.newsFeed.innerHTML = currentNewsData.map(news => `<a href="${news.url}" target="_blank" rel="noopener noreferrer" class="block p-2 rounded-md hover:bg-neutral-800/50 transition-colors"><p class="font-semibold text-neutral-200 text-xs">${news.title}</p><p class="text-xs text-neutral-500">${news.site} - ${timeAgo(news.publishedDate)}</p></a>`).join('');
         }
 
        function renderCryptoFlowTable() {
+            const plan = DOMElements.adminPanel.classList.contains('hidden') ? currentUserData.plan : DOMElements.adminPlanSelector.value;
+            if (plan === 'free') return; // Handled
             if (!currentCryptoData || currentCryptoData.length === 0) {
-                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Could not fetch crypto data.</td></tr>`;
+                DOMElements.cryptoTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Awaiting crypto data...</td></tr>`;
                 return;
             }
             DOMElements.cryptoTbody.innerHTML = currentCryptoData.map(crypto => {
@@ -870,7 +773,7 @@
                 const color1h = change1h >= 0 ? 'text-green-400' : 'text-red-400';
                 const color24h = change24h >= 0 ? 'text-green-400' : 'text-red-400';
                 return `
-                    <tr class="fade-in cursor-pointer hover:bg-neutral-800/50" data-ticker="${crypto.symbol}">
+                    <tr class="fade-in clickable-row cursor-pointer" data-ticker="${crypto.symbol}">
                         <td class="p-2">
                             <div class="font-semibold text-white">${crypto.name}</div>
                             <div class="text-neutral-400">${crypto.symbol}</div>
@@ -897,78 +800,31 @@
             return data.slice(0, 150);
         }
 
-        // --- Sidebar & Data Persistence ---
+        // --- Sidebar & Data Persistence (MODIFIED) ---
+        // Now calls the new updateUserData function
         function addWatchlistItem() { const ticker = DOMElements.watchlistInput.value.toUpperCase().trim(); if (ticker) { userWatchlist.add(ticker); DOMElements.watchlistInput.value = ''; updateUserData({ watchlist: Array.from(userWatchlist) }); } }
         function addAlertItem() { const ticker = DOMElements.alertTickerInput.value.toUpperCase().trim(); const premium = parseInt(DOMElements.alertPremiumSelect.value); if (ticker) { userAlerts.push({ ticker, premium }); DOMElements.alertTickerInput.value = ''; updateUserData({ alerts: userAlerts }); } }
-        function renderWatchlist() { 
-           DOMElements.watchlistContainer.innerHTML = [...userWatchlist].map(ticker => `
-           <div class="sidebar-ticker flex items-center justify-between p-2 rounded-md cursor-pointer" data-ticker="${ticker}">
-               <span class="font-semibold">${ticker}</span>
-               <button data-ticker="${ticker}" class="remove-watchlist-btn text-neutral-500 hover:text-red-400 z-10">&times;</button>
-           </div>`).join(''); 
-           
-           document.querySelectorAll('.remove-watchlist-btn').forEach(btn => btn.addEventListener('click', (e) => { 
-               e.stopPropagation(); // Prevent click from triggering showChartView
-               userWatchlist.delete(e.target.dataset.ticker); 
-               updateUserData({ watchlist: Array.from(userWatchlist) }); 
-           })); 
-       }
+        function renderWatchlist() { DOMElements.watchlistContainer.innerHTML = [...userWatchlist].map(ticker => `<div class="flex items-center justify-between bg-neutral-800/50 p-2 rounded-md"><span class="font-semibold">${ticker}</span><button data-ticker="${ticker}" class="remove-watchlist-btn text-neutral-500 hover:text-red-400">&times;</button></div>`).join(''); document.querySelectorAll('.remove-watchlist-btn').forEach(btn => btn.addEventListener('click', (e) => { userWatchlist.delete(e.target.dataset.ticker); updateUserData({ watchlist: Array.from(userWatchlist) }); })); }
         function renderAlerts() { DOMElements.alertsContainer.innerHTML = userAlerts.map((alert, index) => `<div class="flex items-center justify-between bg-neutral-800/50 p-2 rounded-md text-xs"><span>${alert.ticker} > ${formatCurrency(alert.premium)}</span><button data-index="${index}" class="remove-alert-btn text-neutral-500 hover:text-red-400">&times;</button></div>`).join(''); document.querySelectorAll('.remove-alert-btn').forEach(btn => btn.addEventListener('click', (e) => { userAlerts.splice(e.target.dataset.index, 1); updateUserData({ alerts: userAlerts }); })); }
         function checkAlerts(newData) { newData.forEach(trade => userAlerts.forEach(alert => { if (trade.symbol === alert.ticker && trade.totalValue >= alert.premium) { showAlertBanner(`${trade.symbol} alert: ${formatCurrency(trade.totalValue)} ${trade.sentiment} trade detected`); } })); }
         
-        // --- API & Stripe ---
-        async function fetchApi(url, options = {}) { 
-            try { 
-                const r = await fetch(url, options); 
-                if (!r.ok) { 
-                    const rClone = r.clone();
-                    let errorBody;
-                    try { 
-                        errorBody = await r.json(); 
-                    } catch (e) { 
-                        errorBody = await rClone.text(); 
-                    }
-                    
-                    let friendlyMessage = `API ERROR: ${r.statusText}. Check console for details.`;
-                    if (r.status === 404) {
-                        friendlyMessage = `API FUNCTION NOT FOUND (404). Ensure Netlify build settings are correct.`;
-                    }
-
-                    console.error(`API Error: ${r.status} ${r.statusText}`, errorBody);
-                    DOMElements.apiStatusBanner.textContent = friendlyMessage;
-                    DOMElements.apiStatusBanner.classList.remove('hidden'); 
-                    return null; 
-                } 
-                DOMElements.apiStatusBanner.classList.add('hidden'); 
-                return r.json(); 
-            } catch (e) { 
-                console.error(`Fetch error:`, e);
-                DOMElements.apiStatusBanner.textContent = 'NETWORK ERROR. Could not connect to API.';
-                DOMElements.apiStatusBanner.classList.remove('hidden'); 
-                return null; 
-            } 
-        }
-
-        async function fetchOptionsFlowData(ticker = null) { let url = FMP_PROXY_URL; if (ticker) { url += `?symbol=${ticker}`; } return fetchApi(url); }
-        async function fetchNewsData() { return fetchApi(NEWS_PROXY_URL); }
-        async function fetchCryptoFlowData() { const url = `${CMC_PROXY_URL}?id=${CRYPTO_IDS}`; const result = await fetchApi(url); return result ? Object.values(result.data) : null; }
-
+        // --- API & Stripe (MODIFIED) ---
+        // All fetchApi calls are removed.
         function initiateStripeCheckout(priceId) {
             if (!stripe) { showAlertBanner("Stripe is not configured. Please add a valid publishable key."); return; }
             if (!priceId || priceId.includes('YOUR_')) { showAlertBanner("This plan's checkout is not configured yet."); return; }
-            showAlertBanner(`Redirecting to Stripe for plan with Price ID: ${priceId}`);
+            // This needs a backend function to create a checkout session
+            showAlertBanner(`Stripe integration needed: Create a backend function to handle checkout for ${priceId}`);
         }
         
         // --- Utilities ---
         function getMarketStatus() { const now = new Date(); const nowET = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' })); const day = nowET.getDay(); const hour = nowET.getHours(); const minute = nowET.getMinutes(); const isWeekday = day >= 1 && day <= 5; const marketTime = hour * 60 + minute; const openTime = 9 * 60 + 30; const closeTime = 16 * 60; if (isWeekday && marketTime >= openTime && marketTime < closeTime) { return { isOpen: true, nextEvent: 'close', time: (closeTime - marketTime) * 60 }; } let nextOpenDayIndex = (day === 5 && marketTime >= closeTime) ? 1 : (day === 6 ? 1 : (day === 0 ? 1 : (marketTime < openTime ? day : day + 1))); if(nextOpenDayIndex > 5) nextOpenDayIndex = 1; let daysUntilOpen = (nextOpenDayIndex - day + 7) % 7; if (daysUntilOpen === 0 && marketTime >= closeTime) { daysUntilOpen = day === 5 ? 3 : 1; } let nextOpen = new Date(nowET); nextOpen.setDate(nowET.getDate() + daysUntilOpen); nextOpen.setHours(9, 30, 0, 0); return { isOpen: false, nextEvent: 'open', time: nextOpen.getTime() - nowET.getTime() }; }
-        function updateMarketCountdown() { const status = getMarketStatus(); if (status.isOpen) { const seconds = status.time; const minutes = Math.floor(seconds / 60); const hours = Math.floor(minutes / 60); const remainingMinutes = minutes % 60; DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div><span class="font-semibold text-green-400">Market Open</span><span class="text-neutral-400">| Closes in ${hours}h ${remainingMinutes}m</span></div>`; if(DOMElements.optionsTbody.innerHTML.includes('Market is currently closed')) DOMElements.optionsTbody.innerHTML = '<tr><td colspan="6" class="text-center text-neutral-500 p-12">Awaiting options flow data...</td></tr>'; } else { const ms = status.time; const days = Math.floor(ms / (1000 * 60 * 60 * 24)); const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)); const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60)); const seconds = Math.floor((ms % (1000 * 60)) / 1000); DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-red-500 rounded-full"></div><span class="font-semibold text-red-400">Market Closed</span><span class="text-neutral-400">| Opens in ${days}d ${hours}h ${minutes}m ${seconds}s</span></div>`; DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Market is currently closed. Live options flow will resume on open.</td></tr>`; } }
-        const formatCurrency = (v) => v >= 1000000000 ? `$${(v/1000000000).toFixed(2)}b` : (v >= 1000000 ? `$${(v/1000000).toFixed(2)}m` : (v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v.toFixed(0)}`));
-        const getPremiumColor = (p) => p > 250000 ? 'text-orange-400' : (p > 100000 ? 'text-yellow-400' : '');
+        function updateMarketCountdown() { const status = getMarketStatus(); if (status.isOpen) { const seconds = status.time; const minutes = Math.floor(seconds / 60); const hours = Math.floor(minutes / 60); const remainingMinutes = minutes % 60; DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div><span class="font-semibold text-green-400">Market Open</span><span class="text-neutral-400">| Closes in ${hours}h ${remainingMinutes}m</span></div>`; if(DOMElements.optionsTbody.innerHTML.includes('Market is currently closed')) DOMElements.optionsTbody.innerHTML = '<tr><td colspan="6" class="text-center text-neutral-500 p-12">Awaiting options flow data...</td></tr>'; } else { const ms = status.time; const days = Math.floor(ms / (1000 * 60 * 60 * 24)); const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)); const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60)); const seconds = Math.floor((ms % (1000 * 60)) / 1000); DOMElements.marketStatusContainer.innerHTML = `<div class="flex items-center justify-center gap-2"><div class="w-3 h-3 bg-red-500 rounded-full"></div><span class="font-semibold text-red-400">Market Closed</span><span class="text-neutral-400">| Opens in ${days}d ${hours}h ${minutes}m ${seconds}s</span></div>`; if (currentUserData && currentUserData.plan !== 'free') DOMElements.optionsTbody.innerHTML = `<tr><td colspan="6" class="text-center text-neutral-500 p-12">Market is currently closed. Live options flow will resume on open.</td></tr>`; } }
+        const formatCurrency = (v) => v >= 1000000000 ? `$${(v/1000000000).toFixed(2)}b` : (v >= 1000000 ? `$${(v/1000000).toFixed(2)}m` : (v >= 1000 ? `$${(v/1000).toFixed(1)}k` : `$${v.toFixed(0)}`));
+        const getPremiumColor = (p) => p > 500000 ? 'text-orange-400 font-bold' : (p > 250000 ? 'text-orange-400' : (p > 100000 ? 'text-yellow-400' : ''));
         const timeAgo = (iso) => { if (!iso) return ''; const s = Math.floor((new Date() - new Date(iso)) / 1000); if (s < 0) return 'just now'; let i = s / 31536000; if (i > 1) return `${Math.floor(i)}y ago`; i = s / 2592000; if (i > 1) return `${Math.floor(i)}mo ago`; i = s / 86400; if (i > 1) return `${Math.floor(i)}d ago`; i = s / 3600; if (i > 1) return `${Math.floor(i)}h ago`; i = s / 60; if (i > 1) return `${Math.floor(i)}m ago`; return `${Math.floor(s)}s ago`; };
-        const getFriendlyAuthError = (err) => { switch (err.code) { case 'auth/user-not-found': case 'auth/wrong-password': return 'Invalid email or password.'; case 'auth/email-already-in-use': return 'An account with this email already exists.'; case 'auth/popup-closed-by-user': return 'Sign-in window closed. Please try again.'; case 'auth/internal-error': return 'An internal authentication error occurred. Please try again later.' ; default: console.error("Authentication Error:", err); return 'An unexpected error occurred. Please try again.'; } };
-        const togglePause = () => { isPaused = !isPaused; DOMElements.pausePlayBtn.innerHTML = isPaused ? '<i data-lucide="play-circle" class="w-4 h-4"></i><span>Resume</span>' : '<i data-lucide="pause-circle" class="w-4 h-4"></i><span>Pause</span>'; lucide.createIcons(); };
         const handleFilterClick = (e) => { const btn = e.target.closest('.control-button'); if(btn){ document.querySelectorAll('.control-button').forEach(b => b.classList.remove('active')); btn.classList.add('active'); activeFilter = btn.id.replace('filter-', ''); renderFlowTable(); }};
-        const showAlertBanner = (msg) => { const banner = document.createElement('div'); banner.className = 'alert-banner bg-orange-500 text-white font-bold p-3 rounded-lg shadow-lg mb-2 flex items-center justify-between'; banner.innerHTML = `<span>${msg}</span><button class="ml-4 text-white/80 hover:text-white">&times;</button>`; DOMElements.alertBannerContainer.prepend(banner); banner.querySelector('button').addEventListener('click', () => banner.remove()); setTimeout(() => banner.remove(), 5000); };
+        const showAlertBanner = (msg, type = 'info') => { const colors = { info: 'bg-orange-500', success: 'bg-green-500', error: 'bg-red-500' }; const banner = document.createElement('div'); banner.className = `alert-banner ${colors[type]} text-white font-bold p-3 rounded-lg shadow-lg mb-2 flex items-center justify-between`; banner.innerHTML = `<span>${msg}</span><button class="ml-4 text-white/80 hover:text-white">&times;</button>`; DOMElements.alertBannerContainer.prepend(banner); banner.querySelector('button').addEventListener('click', () => banner.remove()); setTimeout(() => banner.remove(), 5000); };
         const showModal = (type) => { const content = { tos: { title: "Terms of Service", body: `<h4>1. Acceptance of Terms</h4><p>By accessing or using AlphaFlow, you agree to be bound by these Terms of Service...</p><h4>2. Financial Disclaimer</h4><p>AlphaFlow is a data provider and educational tool... You are solely responsible for your own investment decisions...</p>` }, privacy: { title: "Privacy Policy", body: `<h4>1. Information We Collect</h4><p>We collect information to provide and improve our Service...</p><h4>2. Use of Data</h4><p>AlphaFlow uses the collected data for various purposes...</p>`}, contact: { title: "Customer Service", body: `<h4>Contact Information</h4><p>For support, billing questions, or any other inquiries, please email our support team at: <a href="mailto:support@alphaflow.io" class="text-orange-400">support@alphaflow.io</a>.</p>` } }; DOMElements.modalTitle.textContent = content[type].title; DOMElements.modalBody.innerHTML = content[type].body.replace(/\.\.\./g, ' and other standard clauses.'); DOMElements.genericModal.classList.remove('hidden'); };
 
         // --- App Initialization ---
@@ -976,38 +832,19 @@
             DOMElements = Object.fromEntries(Array.from(document.querySelectorAll('[id]')).map(el => [el.id.replace(/-(\w)/g, (m, g) => g.toUpperCase()), el]));
             DOMElements.pages = { dashboard: DOMElements.dashboardPage, plans: DOMElements.plansPage, account: DOMElements.accountPage, backtester: DOMElements.backtesterPage, chart: DOMElements.chartPage };
 
-            try {
-                // --- Initialize Firebase ---
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-
-                // --- Safely initialize Stripe ---
-                if (STRIPE_PUBLISHABLE_KEY && STRIPE_PUBLISHABLE_KEY !== 'YOUR_STRIPE_PUBLISHABLE_KEY') {
-                    stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
-                } else {
-                    console.warn("Stripe key is a placeholder. Payment functionality will be disabled.");
-                }
-                
-                // --- Setup Listeners ---
-                setupAuthListeners(); 
-                setupEventListeners(); 
-                lucide.createIcons(); 
-                
-                onAuthStateChanged(auth, user => { 
-                    authReady = true; 
-                    currentUser = user; 
-                    if (user) { 
-                        loadUserData(user); 
-                    } else { 
-                        handleSignedOutState(); 
-                    } 
-                });
-
-            } catch(e) {
-                console.error("Critical Firebase Initialization Error:", e);
-                showInitializationError(`Failed to initialize Firebase: ${e.message}. Ensure your firebaseConfig object in index.html is correct.`);
+            // --- Safely initialize Stripe ---
+            if (STRIPE_PUBLISHABLE_KEY && STRIPE_PUBLISHABLE_KEY !== 'YOUR_STRIPE_PUBLISHABLE_KEY') {
+                stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+            } else {
+                console.warn("Stripe key is a placeholder. Payment functionality will be disabled.");
             }
+            
+            // --- Setup Listeners ---
+            setupEventListeners(); 
+            lucide.createIcons(); 
+            
+            // --- Start Auth ---
+            initializeAuth();
         });
     </script>
 </body>
